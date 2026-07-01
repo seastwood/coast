@@ -95,6 +95,8 @@ FRAME_DT = 1 / 120.0      # animation tick rate
 TAP_HEALTH_S = 2.0        # how often to confirm the event tap is still enabled
 MAX_LAUNCH_SPEED = 700.0  # px/frame ceiling; faster than any human flick -> treat as a
                           # glitch (e.g. a timing hiccup) and don't fling the cursor
+MT_STALE_S = 0.25         # no multitouch frame within this while the pad is in use ->
+                          # contact detection has gone silent (typically after sleep)
 
 # ---- User-editable settings (live; changed from the menu bar) ----
 APP_NAME = "Coast"
@@ -106,14 +108,12 @@ DEFAULTS = {
     "enabled": True,
     "friction": 0.93,          # velocity *= this every frame (higher = longer glide)
     "min_launch_speed": 8.0,   # don't coast for flicks slower than this px/frame
-    "speed_gain": 1.0,         # multiply launch velocity (cursor flies faster/slower)
 }
 SETTINGS = dict(DEFAULTS)
 
 # Preset choices shown in the menu, as (label, value) in display order.
 GLIDE_PRESETS = [("Short", 0.90), ("Medium", 0.93), ("Long", 0.965)]
 SENS_PRESETS = [("Low", 14.0), ("Medium", 8.0), ("High", 4.0)]
-SPEED_PRESETS = [("Slow", 0.8), ("Normal", 1.0), ("Fast", 1.3), ("Faster", 1.6)]
 
 # Menu bar glyph: a monochrome SF Symbol drawn as a TEMPLATE image, so the system
 # tints it like every other menu bar icon (pure white on a dark/active bar). Swap
@@ -128,7 +128,8 @@ _SYNTHETIC_TAG = 0x7242B411
 
 _lock = threading.Lock()
 _last_positions = []                 # list of (x, y, t)
-_last_event_time = 0.0
+_last_event_time = 0.0                # monotonic time of the last real event
+_last_wall_time = 0.0                 # wall-clock time of the last real event (sleep-aware)
 _coasting = False
 _stop_requested = False
 _fingers_down = False                 # current trackpad contact state (from multitouch)
@@ -174,6 +175,22 @@ def _now():
     return time.monotonic()
 
 
+DEBUG = bool(os.environ.get("COAST_DEBUG"))
+LOG_PATH = os.path.expanduser("~/.coast.log")
+
+
+def _log(msg):
+    """Append a line to ~/.coast.log when COAST_DEBUG=1; a no-op otherwise. Lets us
+    diagnose post-sleep misbehavior in the field without attaching a terminal."""
+    if not DEBUG:
+        return
+    try:
+        with open(LOG_PATH, "a") as f:
+            f.write(f"{time.strftime('%H:%M:%S')} {msg}\n")
+    except OSError:
+        pass
+
+
 # ------------------------------------------------------------------------
 # Settings persistence
 # ------------------------------------------------------------------------
@@ -208,6 +225,7 @@ def save_settings():
 _mt_devices = []
 _mt_callback_ref = None   # keep a ref so the ctypes callback isn't garbage-collected
 _mt_active = False
+_mt_last_frame = 0.0      # monotonic time of the last contact frame (freshness check)
 
 # int callback(int device, void *data, int nFingers, double timestamp, int frame)
 _MTContactCallback = ctypes.CFUNCTYPE(
@@ -222,7 +240,8 @@ _MTContactCallback = ctypes.CFUNCTYPE(
 
 def _mt_contact(device, data, n_fingers, timestamp, frame):
     """Runs on the multitouch frame thread; keep it tiny -- just flip state."""
-    global _fingers_down
+    global _fingers_down, _mt_last_frame
+    _mt_last_frame = _now()   # heartbeat: proves contact detection is still alive
     down = n_fingers > 0
     if down and not _fingers_down:
         # A finger just landed -> brake the coast this instant, and start a
@@ -237,7 +256,7 @@ def _mt_contact(device, data, n_fingers, timestamp, frame):
 
 
 def _init_multitouch():
-    global _mt_active, _mt_callback_ref
+    global _mt_active, _mt_callback_ref, _mt_last_frame
     try:
         mt = ctypes.CDLL(
             "/System/Library/PrivateFrameworks/MultitouchSupport.framework/MultitouchSupport"
@@ -253,6 +272,7 @@ def _init_multitouch():
         cf.CFArrayGetValueAtIndex.argtypes = [ctypes.c_void_p, ctypes.c_long]
         mt.MTRegisterContactFrameCallback.argtypes = [ctypes.c_void_p, _MTContactCallback]
         mt.MTDeviceStart.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        mt.MTDeviceStop.argtypes = [ctypes.c_void_p]
 
         _mt_callback_ref = _MTContactCallback(_mt_contact)
 
@@ -267,6 +287,7 @@ def _init_multitouch():
                 mt.MTDeviceStart(device, 0)
                 _mt_devices.append((mt, device))
         _mt_active = len(_mt_devices) > 0
+        _mt_last_frame = _now()
         return _mt_active
     except Exception as e:
         print(f"MultitouchSupport unavailable ({e}); "
@@ -274,25 +295,60 @@ def _init_multitouch():
         return False
 
 
+def _restart_multitouch():
+    """Re-arm MultitouchSupport after it stops delivering contact frames (notably
+    across sleep/wake). Safety no longer depends on this -- _should_launch falls
+    back to movement-based gating whenever frames go stale -- but reviving it
+    restores the instant brake-on-touch feel."""
+    if not _mt_active:
+        return
+    for mt, device in _mt_devices:
+        try:
+            mt.MTDeviceStop(device)
+        except Exception:
+            pass
+    time.sleep(0.05)
+    for mt, device in _mt_devices:
+        try:
+            mt.MTRegisterContactFrameCallback(device, _mt_callback_ref)
+            mt.MTDeviceStart(device, 0)
+        except Exception:
+            pass
+
+
 def _record_position(x, y, ts):
     """Record a real cursor sample as (x, y, event_time_s, processing_time_s)."""
-    global _last_event_time, _ts_scale
+    global _last_event_time, _last_wall_time, _ts_scale
     tp = _now()
+    tw = time.time()
+    # Detect a sleep/wake gap: the wall clock advances through sleep but the
+    # monotonic clock (tp) is frozen while asleep, so the two diverge by roughly
+    # the sleep duration on the first event after wake. When that happens, discard
+    # the pre-sleep buffer -- otherwise the stale flick still looks "fresh" to the
+    # monotonic-based staleness check and relaunches a coast from a pre-sleep
+    # position (the cursor teleporting and flying off), and a cursor-coordinate
+    # jump across the gap reads as enormous motion. Also brake a coast frozen
+    # mid-flight when we slept.
+    slept = bool(_last_wall_time) and (tw - _last_wall_time) - (tp - _last_event_time) > 0.5
     if _ts_scale is None and ts > 0:
         # First real event: ratio ~1 means ts is mach ticks; ratio >> 1 means ns.
         mach_now = _libc.mach_absolute_time()
         _ts_scale = 1e-9 if (mach_now and ts / mach_now > 5) else MACH_TO_SEC
     te = ts * _ts_scale if (_ts_scale and ts > 0) else tp
     with _lock:
-        if _reset_stroke.is_set():
-            # A finger just touched down: drop anything left from the last
-            # stroke so this flick can't be averaged against stale samples.
+        if slept or _reset_stroke.is_set():
+            # Fresh start (just woke, or a finger just touched down): drop anything
+            # left over so this flick can't be averaged against stale samples.
             _last_positions.clear()
             _reset_stroke.clear()
         _last_positions.append((x, y, te, tp))
         if len(_last_positions) > HISTORY_LEN:
             _last_positions.pop(0)
         _last_event_time = tp
+        _last_wall_time = tw
+    if slept:
+        _coast_cancel.set()
+        _log("sleep/wake gap detected -> cleared motion buffer, cancelled coast")
 
 
 def _clear_history():
@@ -376,12 +432,18 @@ def _should_launch():
     if _coasting or not SETTINGS["enabled"]:
         return None
 
-    if _mt_active:
+    # Trust multitouch contact only while its frames are fresh. After sleep/wake it
+    # can go silent, freezing `_fingers_down` at False; if we kept trusting it we'd
+    # fire coasts *during* ordinary movement (the runaway sensitivity). When it's
+    # stale, fall back to inferring a lift from a pause in real movement instead.
+    mt_live = _mt_active and (_now() - _mt_last_frame) < MT_STALE_S
+    if mt_live:
         # Authoritative contact info: never coast while a finger is on the pad.
         if _fingers_down:
             return None
     else:
-        # No contact info: infer a lift from a pause in real movement events.
+        # No usable contact info: infer a lift from a pause in real movement events,
+        # so we never launch while the finger is still sweeping across the pad.
         with _lock:
             gap = _now() - _last_event_time
             have = len(_last_positions) >= 2
@@ -394,6 +456,7 @@ def _should_launch():
     speed = (vx * vx + vy * vy) ** 0.5
     if speed < SETTINGS["min_launch_speed"] or speed > MAX_LAUNCH_SPEED:
         return None  # too slow to bother, or a glitch reading -> don't fling
+    _log(f"launch v=({vx:.0f},{vy:.0f}) speed={speed:.0f} mt_live={mt_live} fingers={_fingers_down}")
     return vx, vy
 
 
@@ -408,16 +471,7 @@ def _launcher():
         launch = _should_launch()
         if launch is None:
             continue
-        vx, vy = launch
-        gain = SETTINGS["speed_gain"]
-        vx *= gain
-        vy *= gain
-        # Keep even a gained coast bounded, so "Faster" can't fling the cursor.
-        speed = (vx * vx + vy * vy) ** 0.5
-        if speed > MAX_LAUNCH_SPEED:
-            scale = MAX_LAUNCH_SPEED / speed
-            vx *= scale
-            vy *= scale
+        vx, vy = launch  # already bounded to MAX_LAUNCH_SPEED by _should_launch
 
         with _lock:
             if len(_last_positions) < 2:
@@ -450,12 +504,20 @@ def _tap_callback(proxy, event_type, event, refcon):
 
 
 def _tap_watchdog():
-    """Safety net for the case the disable notification never reaches us (e.g.
-    across sleep/wake): periodically confirm the tap is live and re-arm it."""
+    """Safety net across sleep/wake: keep the event tap enabled, and revive
+    MultitouchSupport if it goes silent while the trackpad is clearly in use (real
+    move events arriving but no contact frames) -- which otherwise persists until
+    Coast is restarted. Launch gating already degrades safely when frames are
+    stale; this just restores the instant brake-on-touch."""
     while not _stop_requested:
         time.sleep(TAP_HEALTH_S)
         if _tap is not None and not CGEventTapIsEnabled(_tap):
             Quartz.CGEventTapEnable(_tap, True)
+        if _mt_active:
+            now = _now()
+            if now - _mt_last_frame > 1.0 and now - _last_event_time < 1.0:
+                _log("multitouch silent while pad in use -> restarting it")
+                _restart_multitouch()
 
 
 # ------------------------------------------------------------------------
@@ -532,7 +594,6 @@ def _build_menu(controller):
     for base, action, presets, key in (
         ("Glide", "pickGlide:", GLIDE_PRESETS, "friction"),
         ("Flick sensitivity", "pickSensitivity:", SENS_PRESETS, "min_launch_speed"),
-        ("Cursor speed", "pickSpeed:", SPEED_PRESETS, "speed_gain"),
     ):
         submenu, items, values = _make_submenu(controller, action, presets)
         parent = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(base, None, "")
@@ -566,9 +627,6 @@ class MenuController(NSObject):
 
     def pickSensitivity_(self, sender):
         self._apply("min_launch_speed", sender)
-
-    def pickSpeed_(self, sender):
-        self._apply("speed_gain", sender)
 
     @objc.python_method
     def _apply(self, key, sender):

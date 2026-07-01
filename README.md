@@ -62,7 +62,6 @@ Click the menu bar icon:
 | **Enabled** | Turn the effect on or off. |
 | **Glide** | How far the cursor coasts — friction: Short / Medium / Long. |
 | **Flick sensitivity** | How hard you must flick to start a coast: Low / Medium / High. |
-| **Cursor speed** | A multiplier on the launch speed: Slow / Normal / Fast / Faster. |
 
 Your choices are saved to `~/.coast.json` and restored on launch.
 
