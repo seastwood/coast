@@ -40,7 +40,12 @@ again right away and it just works — no pause, no swallowed motion.
 1. Download **`Coast.dmg`** from the [Releases](https://github.com/seastwood/coast/releases)
    page (Apple Silicon; for Intel, build from source below).
 2. Open it and drag **Coast** onto **Applications**.
-3. First launch: right-click **Coast.app → Open** (it's self-signed, so Gatekeeper asks once).
+3. First launch — Coast is self-signed (not notarized by Apple), so macOS blocks it once:
+   - Double-click **Coast**. When macOS says it *"can't verify it's free of malware,"* click **Done**.
+   - Open **System Settings → Privacy & Security**, scroll to the **Security** section, and click
+     **Open Anyway** next to the note about Coast, then confirm and authenticate.
+
+   (The old right-click → Open shortcut no longer works on macOS 15+.)
 4. Grant permissions in **System Settings → Privacy & Security**:
    - **Accessibility**
    - **Input Monitoring**
