@@ -9,6 +9,10 @@
   Flick and lift — the pointer keeps gliding. Touch the trackpad — it stops dead.
 </p>
 
+<p align="center">
+  <a href="https://buymeacoffee.com/eastwoodsee"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="40" alt="Buy Me A Coffee"></a>
+</p>
+
 ---
 
 Coast lives in your menu bar and gives a trackpad the feel of a real trackball. Give the
