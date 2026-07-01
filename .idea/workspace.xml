@@ -4,7 +4,93 @@
     <option name="autoReloadType" value="ALL" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="fca39b9f-6615-45f0-a2cb-79d4a996fd4c" name="Changes" comment="" />
+    <list default="true" id="fca39b9f-6615-45f0-a2cb-79d4a996fd4c" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Coast.dmg" beforeDir="false" afterPath="$PROJECT_DIR$/Coast.dmg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/Coast/Analysis-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/build/Coast/Analysis-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/Coast/BUNDLE-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/build/Coast/BUNDLE-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/Coast/COLLECT-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/build/Coast/COLLECT-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/Coast/Coast" beforeDir="false" afterPath="$PROJECT_DIR$/build/Coast/Coast" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/Coast/Coast.pkg" beforeDir="false" afterPath="$PROJECT_DIR$/build/Coast/Coast.pkg" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/Coast/EXE-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/build/Coast/EXE-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/Coast/PKG-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/build/Coast/PKG-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/Coast/PYZ-00.pyz" beforeDir="false" afterPath="$PROJECT_DIR$/build/Coast/PYZ-00.pyz" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/Coast/PYZ-00.toc" beforeDir="false" afterPath="$PROJECT_DIR$/build/Coast/PYZ-00.toc" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/Coast/base_library.zip" beforeDir="false" afterPath="$PROJECT_DIR$/build/Coast/base_library.zip" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/Coast/warn-Coast.txt" beforeDir="false" afterPath="$PROJECT_DIR$/build/Coast/warn-Coast.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/build/Coast/xref-Coast.html" beforeDir="false" afterPath="$PROJECT_DIR$/build/Coast/xref-Coast.html" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/AppKit/_AppKit.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/AppKit/_AppKit.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/AppKit/_inlines.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/AppKit/_inlines.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/CoreFoundation/_CoreFoundation.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/CoreFoundation/_CoreFoundation.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/CoreFoundation/_inlines.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/CoreFoundation/_inlines.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Foundation/_Foundation.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Foundation/_Foundation.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Foundation/_inlines.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Foundation/_inlines.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Python3.framework/Versions/3.9/Python3" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Python3.framework/Versions/3.9/Python3" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/CoreGraphics/_callbacks.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/CoreGraphics/_callbacks.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/CoreGraphics/_coregraphics.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/CoreGraphics/_coregraphics.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/CoreGraphics/_doubleindirect.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/CoreGraphics/_doubleindirect.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/CoreGraphics/_inlines.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/CoreGraphics/_inlines.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/CoreGraphics/_sortandmap.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/CoreGraphics/_sortandmap.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/CoreVideo/_CVPixelBuffer.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/CoreVideo/_CVPixelBuffer.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/ImageKit/_imagekit.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/ImageKit/_imagekit.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/PDFKit/_PDFKit.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/PDFKit/_PDFKit.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/QuartzCore/_quartzcore.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/QuartzCore/_quartzcore.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/QuickLookUI/_QuickLookUI.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/Quartz/QuickLookUI/_QuickLookUI.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/objc/_machsignals.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/objc/_machsignals.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/objc/_objc.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/objc/_objc.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_bisect.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_bisect.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_blake2.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_blake2.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_bz2.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_bz2.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_codecs_cn.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_codecs_cn.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_codecs_hk.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_codecs_hk.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_codecs_iso2022.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_codecs_iso2022.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_codecs_jp.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_codecs_jp.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_codecs_kr.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_codecs_kr.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_codecs_tw.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_codecs_tw.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_contextvars.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_contextvars.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_csv.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_csv.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_ctypes.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_ctypes.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_datetime.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_datetime.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_decimal.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_decimal.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_elementtree.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_elementtree.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_hashlib.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_hashlib.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_heapq.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_heapq.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_json.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_json.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_lzma.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_lzma.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_md5.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_md5.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_multibytecodec.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_multibytecodec.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_opcode.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_opcode.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_pickle.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_pickle.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_posixsubprocess.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_posixsubprocess.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_random.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_random.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_scproxy.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_scproxy.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_sha1.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_sha1.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_sha256.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_sha256.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_sha3.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_sha3.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_sha512.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_sha512.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_socket.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_socket.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_ssl.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_ssl.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_statistics.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_statistics.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_struct.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/_struct.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/array.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/array.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/binascii.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/binascii.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/grp.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/grp.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/math.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/math.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/pyexpat.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/pyexpat.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/readline.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/readline.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/resource.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/resource.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/select.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/select.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/termios.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/termios.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/unicodedata.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/unicodedata.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/zlib.cpython-39-darwin.so" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Frameworks/python3__dot__9/lib-dynload/zlib.cpython-39-darwin.so" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/MacOS/Coast" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/MacOS/Coast" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/Resources/base_library.zip" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/Resources/base_library.zip" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast.app/Contents/_CodeSignature/CodeResources" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast.app/Contents/_CodeSignature/CodeResources" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast/Coast" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast/Coast" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/dist/Coast/_internal/base_library.zip" beforeDir="false" afterPath="$PROJECT_DIR$/dist/Coast/_internal/base_library.zip" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
@@ -37,7 +123,9 @@
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
     "ModuleVcsDetector.initialDetectionPerformed": "true",
+    "Python.main.executor": "Run",
     "RunOnceActivity.ShowReadmeOnStart": "true",
+    "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
     "RunOnceActivity.typescript.service.memoryLimit.init": "true",
     "codeWithMe.voiceChat.enabledByDefault": "false",
@@ -50,10 +138,43 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
+    "settings.editor.selected.configurable": "com.jetbrains.python.configuration.PyActiveSdkModuleConfigurable",
     "to.speed.mode.migration.done": "true",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
+  <component name="RunManager">
+    <configuration name="main" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="coast" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <option name="DEBUG_JUST_MY_CODE" value="false" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="RUN_TOOL" value="" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/main.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.main" />
+      </list>
+    </recent_temporary>
+  </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
@@ -68,11 +189,14 @@
       <option name="number" value="Default" />
       <option name="presentableId" value="Default" />
       <updated>1782866025989</updated>
-      <workItem from="1782866027017" duration="959000" />
+      <workItem from="1782866027017" duration="4296000" />
     </task>
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
     <option name="version" value="3" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/coast$main.coverage" NAME="main Coverage Results" MODIFIED="1782871804196" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>
