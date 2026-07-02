@@ -103,6 +103,7 @@ MT_STALE_S = 0.25         # no multitouch frame within this while the pad is in 
 
 # ---- User-editable settings (live; changed from the menu bar) ----
 APP_NAME = "Coast"
+APP_VERSION = "1.2"   # shown in the menu header; build_dmg.sh stamps it into Info.plist
 CONFIG_PATH = os.path.expanduser("~/.coast.json")
 # Older config filenames, read once if the current one is missing so settings
 # carry over after a rename.
@@ -672,7 +673,12 @@ def _make_submenu(controller, action, presets):
 def _build_menu(controller):
     menu = NSMenu.alloc().init()
 
-    header = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(APP_NAME, None, "")
+    # Header: app name + version in one plain title; the disabled item renders it
+    # all in the standard quiet gray. (A flush-right version was tried two ways and
+    # rejected: NSMenuItemBadge draws too much attention, and a right-aligned tab
+    # stop forces the menu wider than its natural width.)
+    header = NSMenuItem.alloc().initWithTitle_action_keyEquivalent_(
+        f"{APP_NAME} {APP_VERSION}", None, "")
     header.setEnabled_(False)
     menu.addItem_(header)
     menu.addItem_(NSMenuItem.separatorItem())
