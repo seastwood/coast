@@ -36,6 +36,7 @@ import os
 import json
 import time
 import ctypes
+import fcntl
 import threading
 import objc
 import Quartz
@@ -89,7 +90,9 @@ HISTORY_LEN = 10          # how many recent samples to keep for the velocity est
 VELOCITY_WINDOW_S = 0.05  # estimate release velocity from motion in this final window
 STALE_SAMPLE_S = 0.08     # if the last motion is older than this at lift, don't fling
 STOP_GAP_S = 0.035        # (no-multitouch fallback) event silence that counts as a lift
-LAUNCH_POLL_S = 0.010     # launcher wakeup cadence
+LAUNCH_POLL_S = 0.010     # launcher wakeup cadence while the pad is in use
+IDLE_POLL_S = 0.25        # launcher wakeup cadence once the pad has gone idle
+PAD_ACTIVE_S = 0.5        # "pad in use" = a real move event within this window
 MIN_SPEED = 2.0           # px/frame below which the coast ends
 FRAME_DT = 1 / 120.0      # animation tick rate
 TAP_HEALTH_S = 2.0        # how often to confirm the event tap is still enabled
@@ -104,6 +107,7 @@ CONFIG_PATH = os.path.expanduser("~/.coast.json")
 # Older config filenames, read once if the current one is missing so settings
 # carry over after a rename.
 LEGACY_CONFIG_PATHS = [os.path.expanduser("~/.trackball_inertia.json")]
+LOCK_PATH = os.path.expanduser("~/.coast.lock")   # single-instance flock
 DEFAULTS = {
     "enabled": True,
     "friction": 0.93,          # velocity *= this every frame (higher = longer glide)
@@ -136,6 +140,7 @@ _fingers_down = False                 # current trackpad contact state (from mul
 _coast_cancel = threading.Event()    # set to brake the active coast immediately
 _lift_event = threading.Event()      # set when a finger lifts, to wake the launcher
 _reset_stroke = threading.Event()    # set on touch: the next sample starts a fresh stroke
+_mt_rebuild_request = threading.Event()  # set on wake detection -> rebuild MT right away
 _event_source = None                 # zero-suppression source used to post coast moves
 
 # ---- Event-time clock --------------------------------------------------------
@@ -211,10 +216,38 @@ def load_settings():
 
 def save_settings():
     try:
-        with open(CONFIG_PATH, "w") as f:
+        tmp = CONFIG_PATH + ".tmp"
+        with open(tmp, "w") as f:
             json.dump(SETTINGS, f, indent=2)
+        os.replace(tmp, CONFIG_PATH)   # atomic: a crash mid-write can't corrupt the file
     except OSError:
         pass
+
+
+_instance_lock_file = None   # kept open for the process lifetime; the flock dies with us
+
+
+def _acquire_single_instance_lock():
+    """Refuse to run two Coasts at once (e.g. the installed app plus a dev run from
+    source): both would post coast moves and brake each other's coasts. Holds an
+    exclusive flock on LOCK_PATH; the kernel releases it when the process exits --
+    even on a crash -- so there are no stale locks to clean up."""
+    global _instance_lock_file
+    try:
+        _instance_lock_file = open(LOCK_PATH, "a")
+    except OSError:
+        return True   # can't create the lock file -> don't block startup over it
+    try:
+        fcntl.flock(_instance_lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError:
+        return False  # another instance holds the lock
+    try:
+        _instance_lock_file.truncate(0)
+        _instance_lock_file.write(str(os.getpid()))
+        _instance_lock_file.flush()
+    except OSError:
+        pass
+    return True
 
 
 # ------------------------------------------------------------------------
@@ -222,6 +255,8 @@ def save_settings():
 # We only read the finger COUNT argument, never the struct contents, so this
 # is robust against the private Finger struct layout changing.
 # ------------------------------------------------------------------------
+_mt = None                # MultitouchSupport CDLL (kept so we can rebuild devices on wake)
+_cf = None                # CoreFoundation CDLL
 _mt_devices = []
 _mt_callback_ref = None   # keep a ref so the ctypes callback isn't garbage-collected
 _mt_active = False
@@ -255,37 +290,50 @@ def _mt_contact(device, data, n_fingers, timestamp, frame):
     return 0
 
 
+def _mt_open_devices():
+    """Create, register, and start a FRESH set of MultitouchSupport devices.
+
+    Building a new device list each time is what makes post-sleep recovery work:
+    after a long sleep the framework tears the old device objects down, and
+    MTDeviceStart on a stale handle silently delivers no frames -- only devices
+    from a newly created list come back to life. Used by both init and restart.
+    """
+    devices = []
+    device_list = _mt.MTDeviceCreateList()
+    if not device_list:
+        return devices
+    count = _cf.CFArrayGetCount(device_list)
+    for i in range(count):
+        device = _cf.CFArrayGetValueAtIndex(device_list, i)
+        if device:
+            _mt.MTRegisterContactFrameCallback(device, _mt_callback_ref)
+            _mt.MTDeviceStart(device, 0)
+            devices.append((_mt, device))
+    return devices
+
+
 def _init_multitouch():
-    global _mt_active, _mt_callback_ref, _mt_last_frame
+    global _mt, _cf, _mt_devices, _mt_active, _mt_callback_ref, _mt_last_frame
     try:
-        mt = ctypes.CDLL(
+        _mt = ctypes.CDLL(
             "/System/Library/PrivateFrameworks/MultitouchSupport.framework/MultitouchSupport"
         )
-        cf = ctypes.CDLL(
+        _cf = ctypes.CDLL(
             "/System/Library/Frameworks/CoreFoundation.framework/CoreFoundation"
         )
 
-        mt.MTDeviceCreateList.restype = ctypes.c_void_p
-        cf.CFArrayGetCount.restype = ctypes.c_long
-        cf.CFArrayGetCount.argtypes = [ctypes.c_void_p]
-        cf.CFArrayGetValueAtIndex.restype = ctypes.c_void_p
-        cf.CFArrayGetValueAtIndex.argtypes = [ctypes.c_void_p, ctypes.c_long]
-        mt.MTRegisterContactFrameCallback.argtypes = [ctypes.c_void_p, _MTContactCallback]
-        mt.MTDeviceStart.argtypes = [ctypes.c_void_p, ctypes.c_int]
-        mt.MTDeviceStop.argtypes = [ctypes.c_void_p]
+        _mt.MTDeviceCreateList.restype = ctypes.c_void_p
+        _cf.CFArrayGetCount.restype = ctypes.c_long
+        _cf.CFArrayGetCount.argtypes = [ctypes.c_void_p]
+        _cf.CFArrayGetValueAtIndex.restype = ctypes.c_void_p
+        _cf.CFArrayGetValueAtIndex.argtypes = [ctypes.c_void_p, ctypes.c_long]
+        _mt.MTRegisterContactFrameCallback.argtypes = [ctypes.c_void_p, _MTContactCallback]
+        _mt.MTDeviceStart.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        _mt.MTDeviceStop.argtypes = [ctypes.c_void_p]
 
         _mt_callback_ref = _MTContactCallback(_mt_contact)
 
-        device_list = mt.MTDeviceCreateList()
-        if not device_list:
-            return False
-        count = cf.CFArrayGetCount(device_list)
-        for i in range(count):
-            device = cf.CFArrayGetValueAtIndex(device_list, i)
-            if device:
-                mt.MTRegisterContactFrameCallback(device, _mt_callback_ref)
-                mt.MTDeviceStart(device, 0)
-                _mt_devices.append((mt, device))
+        _mt_devices = _mt_open_devices()
         _mt_active = len(_mt_devices) > 0
         _mt_last_frame = _now()
         return _mt_active
@@ -296,24 +344,28 @@ def _init_multitouch():
 
 
 def _restart_multitouch():
-    """Re-arm MultitouchSupport after it stops delivering contact frames (notably
-    across sleep/wake). Safety no longer depends on this -- _should_launch falls
-    back to movement-based gating whenever frames go stale -- but reviving it
-    restores the instant brake-on-touch feel."""
+    """Rebuild MultitouchSupport after it stops delivering contact frames (notably
+    across a long lid-closed sleep). Stopping and re-starting the SAME device
+    handles is NOT enough -- after a deep sleep those objects are dead and deliver
+    nothing -- so we drop them and create a brand-new device list. Reviving this is
+    what restores brake-on-touch: a finger placed down WITHOUT moving is seen only
+    by MultitouchSupport, so while it's dead a coast won't stop on contact and
+    _should_launch is left on its movement-gap fallback."""
+    global _mt_devices, _mt_last_frame
     if not _mt_active:
         return
-    for mt, device in _mt_devices:
+    for lib, device in _mt_devices:
         try:
-            mt.MTDeviceStop(device)
+            lib.MTDeviceStop(device)   # a no-op if the handle is already dead
         except Exception:
             pass
+    _mt_devices = []
     time.sleep(0.05)
-    for mt, device in _mt_devices:
-        try:
-            mt.MTRegisterContactFrameCallback(device, _mt_callback_ref)
-            mt.MTDeviceStart(device, 0)
-        except Exception:
-            pass
+    _mt_devices = _mt_open_devices()   # fresh handles bound to the revived service
+    # Measure silence from this attempt, not the ancient pre-sleep frame, so the
+    # watchdog retries in ~TAP_HEALTH_S if frames still don't come.
+    _mt_last_frame = _now()
+    _log(f"rebuilt multitouch -> {len(_mt_devices)} device(s)")
 
 
 def _record_position(x, y, ts):
@@ -330,6 +382,7 @@ def _record_position(x, y, ts):
     # jump across the gap reads as enormous motion. Also brake a coast frozen
     # mid-flight when we slept.
     slept = bool(_last_wall_time) and (tw - _last_wall_time) - (tp - _last_event_time) > 0.5
+    was_idle = (tp - _last_event_time) > PAD_ACTIVE_S   # pad returning from idle?
     if _ts_scale is None and ts > 0:
         # First real event: ratio ~1 means ts is mach ticks; ratio >> 1 means ns.
         mach_now = _libc.mach_absolute_time()
@@ -346,8 +399,17 @@ def _record_position(x, y, ts):
             _last_positions.pop(0)
         _last_event_time = tp
         _last_wall_time = tw
+    if was_idle:
+        # First event after an idle stretch: snap the launcher out of its slow idle
+        # tick so even an immediate quick flick gets full-rate fallback polling.
+        _lift_event.set()
     if slept:
         _coast_cancel.set()
+        # Ask the watchdog to rebuild MultitouchSupport NOW -- it is very likely
+        # dead after a sleep this long, and waiting for the next periodic tick
+        # leaves brake-on-touch broken for the first post-wake interaction.
+        # Event.set() is non-blocking, so this is safe on the event-tap thread.
+        _mt_rebuild_request.set()
         _log("sleep/wake gap detected -> cleared motion buffer, cancelled coast")
 
 
@@ -420,6 +482,8 @@ def _coast(start_x, start_y, vx, vy):
             # from the multitouch thread), so the brake feels immediate.
             if _coast_cancel.wait(FRAME_DT):
                 break
+    except Exception as e:
+        _log(f"coast error: {e!r}")   # end this coast; never kill future ones
     finally:
         _coasting = False
 
@@ -464,42 +528,56 @@ def _launcher():
     """Starts a coast when a finger lifts after a flick."""
     global _coasting
     while not _stop_requested:
-        # Wake promptly on a lift (multitouch), otherwise poll for the fallback path.
-        _lift_event.wait(LAUNCH_POLL_S)
-        _lift_event.clear()
+        try:
+            # Wake promptly on a lift (multitouch), otherwise poll for the fallback
+            # path -- fast only while the pad is in use. Once the pad goes idle, back
+            # off to a slow tick: the first real event after idle sets _lift_event
+            # (see _record_position), so a flick out of idle still gets full-rate
+            # polling from its very first sample.
+            active = (_now() - _last_event_time) < PAD_ACTIVE_S
+            _lift_event.wait(LAUNCH_POLL_S if active else IDLE_POLL_S)
+            _lift_event.clear()
 
-        launch = _should_launch()
-        if launch is None:
-            continue
-        vx, vy = launch  # already bounded to MAX_LAUNCH_SPEED by _should_launch
-
-        with _lock:
-            if len(_last_positions) < 2:
+            launch = _should_launch()
+            if launch is None:
                 continue
-            x, y, _, _ = _last_positions[-1]
+            vx, vy = launch  # already bounded to MAX_LAUNCH_SPEED by _should_launch
 
-        _clear_history()       # consume the flick so it can't relaunch later
-        _coast_cancel.clear()
-        _coasting = True
-        threading.Thread(target=_coast, args=(x, y, vx, vy), daemon=True).start()
+            with _lock:
+                if len(_last_positions) < 2:
+                    continue
+                x, y, _, _ = _last_positions[-1]
+
+            _clear_history()       # consume the flick so it can't relaunch later
+            _coast_cancel.clear()
+            _coasting = True
+            threading.Thread(target=_coast, args=(x, y, vx, vy), daemon=True).start()
+        except Exception as e:
+            # A surprise here would otherwise kill this thread -- and with it all
+            # coasting -- until relaunch. Log and keep serving.
+            _log(f"launcher error: {e!r}")
+            time.sleep(0.1)
 
 
 def _tap_callback(proxy, event_type, event, refcon):
-    if event_type in (kCGEventTapDisabledByTimeout, kCGEventTapDisabledByUserInput):
-        # macOS disabled our tap -- a callback timeout, or (the common case) the
-        # machine slept and woke. Re-arm it so Coast recovers without a restart.
-        if _tap is not None:
-            Quartz.CGEventTapEnable(_tap, True)
-        return event
-    if event_type in (kCGEventMouseMoved, kCGEventLeftMouseDragged):
-        if CGEventGetIntegerValueField(event, kCGEventSourceUserData) == _SYNTHETIC_TAG:
-            return event  # our own coast move -- not the user's finger; ignore it
-        # Real finger movement. Fallback brake (used if MultitouchSupport isn't
-        # active): any real event during a coast means the user is touching.
-        if _coasting:
-            _coast_cancel.set()
-        loc = CGEventGetLocation(event)
-        _record_position(loc.x, loc.y, CGEventGetTimestamp(event))
+    try:
+        if event_type in (kCGEventTapDisabledByTimeout, kCGEventTapDisabledByUserInput):
+            # macOS disabled our tap -- a callback timeout, or (the common case) the
+            # machine slept and woke. Re-arm it so Coast recovers without a restart
+            # (unless the user switched Coast off, in which case off means off).
+            if _tap is not None and SETTINGS["enabled"]:
+                Quartz.CGEventTapEnable(_tap, True)
+        elif event_type in (kCGEventMouseMoved, kCGEventLeftMouseDragged):
+            if CGEventGetIntegerValueField(event, kCGEventSourceUserData) != _SYNTHETIC_TAG:
+                # Real finger movement (not our own coast move). Fallback brake, used
+                # if MultitouchSupport isn't active: any real event during a coast
+                # means the user is touching.
+                if _coasting:
+                    _coast_cancel.set()
+                loc = CGEventGetLocation(event)
+                _record_position(loc.x, loc.y, CGEventGetTimestamp(event))
+    except Exception as e:
+        _log(f"tap callback error: {e!r}")   # never let one bad event break the tap
     return event
 
 
@@ -510,14 +588,31 @@ def _tap_watchdog():
     Coast is restarted. Launch gating already degrades safely when frames are
     stale; this just restores the instant brake-on-touch."""
     while not _stop_requested:
-        time.sleep(TAP_HEALTH_S)
-        if _tap is not None and not CGEventTapIsEnabled(_tap):
-            Quartz.CGEventTapEnable(_tap, True)
-        if _mt_active:
-            now = _now()
-            if now - _mt_last_frame > 1.0 and now - _last_event_time < 1.0:
-                _log("multitouch silent while pad in use -> restarting it")
-                _restart_multitouch()
+        try:
+            # Tick every TAP_HEALTH_S -- or instantly when _record_position detects a
+            # sleep/wake gap, so MT is rebuilt on the FIRST post-wake stroke instead of
+            # up to a full tick later (a still finger placed mid-coast brakes right away).
+            woke = _mt_rebuild_request.wait(TAP_HEALTH_S)
+            _mt_rebuild_request.clear()
+            # Respect the menu toggle: while Coast is off the tap is deliberately
+            # disabled; re-arming it here would undo that.
+            if _tap is not None and SETTINGS["enabled"] and not CGEventTapIsEnabled(_tap):
+                Quartz.CGEventTapEnable(_tap, True)
+            if _mt_active:
+                now = _now()
+                # Dead-MT signature: real move events keep arriving (pad in use) but no
+                # contact frames -- brake-on-touch stays broken until we rebuild MT. Use
+                # a full health-check interval as the "recently used" window so activity
+                # that lands between ticks still triggers recovery.
+                if woke or (now - _mt_last_frame > 1.0 and now - _last_event_time < TAP_HEALTH_S):
+                    _log("wake signal -> rebuilding multitouch" if woke
+                         else "multitouch silent while pad in use -> rebuilding it")
+                    _restart_multitouch()
+        except Exception as e:
+            # The watchdog IS the recovery path; if it died, sleep/wake recovery
+            # would die with it. Log and keep ticking.
+            _log(f"watchdog error: {e!r}")
+            time.sleep(TAP_HEALTH_S)
 
 
 # ------------------------------------------------------------------------
@@ -619,6 +714,11 @@ class MenuController(NSObject):
         SETTINGS["enabled"] = not SETTINGS["enabled"]
         if not SETTINGS["enabled"]:
             _coast_cancel.set()   # stop any coast in flight when turning off
+        # Gate the event tap with the toggle. While off, the tap would otherwise
+        # still wake Python for every mouse move on the system; disabling it makes
+        # "off" genuinely free. The watchdog and tap callback both respect this.
+        if _tap is not None:
+            Quartz.CGEventTapEnable(_tap, bool(SETTINGS["enabled"]))
         save_settings()
         self.refresh()
 
@@ -691,7 +791,9 @@ def _start_input_pipeline():
 
     _runloop_source = CFMachPortCreateRunLoopSource(None, _tap, 0)
     CFRunLoopAddSource(CFRunLoopGetCurrent(), _runloop_source, kCFRunLoopCommonModes)
-    Quartz.CGEventTapEnable(_tap, True)
+    # Honor a persisted "off" from last session: leave the tap disabled until the
+    # user re-enables Coast from the menu.
+    Quartz.CGEventTapEnable(_tap, bool(SETTINGS["enabled"]))
 
     threading.Thread(target=_launcher, daemon=True).start()
     threading.Thread(target=_tap_watchdog, daemon=True).start()
@@ -700,6 +802,10 @@ def _start_input_pipeline():
 
 def main():
     global _status_item, _menu, _controller
+
+    if not _acquire_single_instance_lock():
+        print(f"{APP_NAME} is already running; exiting this instance.")
+        return
 
     load_settings()
 
