@@ -7,7 +7,10 @@ cd "$(dirname "$0")"
 
 APP="Coast"
 BUNDLE_ID="com.eastwoodseth.coast"
-VERSION="1.0.0"
+# Version is read from APP_VERSION in main.py -- single source of truth, so the
+# menu header and the bundle's Info.plist can never drift apart.
+VERSION="$(sed -n 's/^APP_VERSION = "\([^"]*\)".*/\1/p' main.py)"
+[ -n "$VERSION" ] || { echo "ERROR: could not read APP_VERSION from main.py"; exit 1; }
 SIGN_IDENTITY="Coast Self-Signed"
 KEYCHAIN="coast-codesign.keychain"
 KC_PASS="coast"
