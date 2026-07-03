@@ -30,6 +30,8 @@ again right away and it just works — no pause, no swallowed motion.
   delayed or swallowed.
 - **Release-speed accurate** — the coast launches at the speed of your flick, not an
   average, so it feels like a real throw.
+- **Trackpads only** — coasting requires real finger contact, so mice are never affected.
+  A Magic Mouse counts as a mouse, not a trackpad.
 - **Menu bar controls** — toggle on/off and tune the feel; settings persist to `~/.coast.json`.
 - **Survives sleep/wake** — re-arms its event tap automatically if macOS disables it, so it
   keeps working after your laptop wakes.
