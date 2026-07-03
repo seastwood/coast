@@ -12,6 +12,12 @@ The feel is modeled on a real trackball:
     * the coast launches at your *release* speed, not an averaged speed
     * you can re-flick the instant you touch down -- no pause, no swallowed motion
 
+The effect is trackpad-only. A coast launches only when MultitouchSupport saw
+the motion happen under real finger contact and then saw the fingers lift, so
+moving a regular mouse never coasts. The Magic Mouse -- itself a multitouch
+device -- is excluded from contact detection by its device family, so it
+behaves like any other mouse.
+
 The coast moves the cursor by POSTING mouse-moved events from an event source
 whose local-events-suppression interval is zero. That is the crucial detail:
 CGWarpMouseCursorPosition suppresses real hardware input for ~250ms after every
@@ -89,7 +95,6 @@ from PyObjCTools import AppHelper
 HISTORY_LEN = 10          # how many recent samples to keep for the velocity estimate
 VELOCITY_WINDOW_S = 0.05  # estimate release velocity from motion in this final window
 STALE_SAMPLE_S = 0.08     # if the last motion is older than this at lift, don't fling
-STOP_GAP_S = 0.035        # (no-multitouch fallback) event silence that counts as a lift
 LAUNCH_POLL_S = 0.010     # launcher wakeup cadence while the pad is in use
 IDLE_POLL_S = 0.25        # launcher wakeup cadence once the pad has gone idle
 PAD_ACTIVE_S = 0.5        # "pad in use" = a real move event within this window
@@ -100,10 +105,17 @@ MAX_LAUNCH_SPEED = 700.0  # px/frame ceiling; faster than any human flick -> tre
                           # glitch (e.g. a timing hiccup) and don't fling the cursor
 MT_STALE_S = 0.25         # no multitouch frame within this while the pad is in use ->
                           # contact detection has gone silent (typically after sleep)
+MT_MOUSE_FAMILIES = {112, 113}  # MTDeviceGetFamilyID values for Magic Mice: multitouch
+                          # devices too, but they're mice -- never give them the coast
+                          # effect, so no contact callback is registered on them
+MT_SILENT_REBUILD_S = 30.0  # min gap between rebuilds triggered by frame silence alone;
+                          # ordinary MOUSE movement mimics the dead-MT signature (moves
+                          # arriving, untouched trackpad sending no frames), so silence
+                          # rebuilds are throttled instead of firing every health tick
 
 # ---- User-editable settings (live; changed from the menu bar) ----
 APP_NAME = "Coast"
-APP_VERSION = "1.2"   # shown in the menu header; build_dmg.sh stamps it into Info.plist
+APP_VERSION = "1.3"   # shown in the menu header; build_dmg.sh stamps it into Info.plist
 CONFIG_PATH = os.path.expanduser("~/.coast.json")
 # Older config filenames, read once if the current one is missing so settings
 # carry over after a rename.
@@ -132,7 +144,7 @@ ICON_POINT_SIZE = 16.0
 _SYNTHETIC_TAG = 0x7242B411
 
 _lock = threading.Lock()
-_last_positions = []                 # list of (x, y, t)
+_last_positions = []                 # list of (x, y, te, tp, fingers_down)
 _last_event_time = 0.0                # monotonic time of the last real event
 _last_wall_time = 0.0                 # wall-clock time of the last real event (sleep-aware)
 _coasting = False
@@ -262,6 +274,7 @@ _mt_devices = []
 _mt_callback_ref = None   # keep a ref so the ctypes callback isn't garbage-collected
 _mt_active = False
 _mt_last_frame = 0.0      # monotonic time of the last contact frame (freshness check)
+_mt_last_silent_rebuild = 0.0  # last frame-silence-triggered rebuild (throttled)
 
 # int callback(int device, void *data, int nFingers, double timestamp, int frame)
 _MTContactCallback = ctypes.CFUNCTYPE(
@@ -291,6 +304,25 @@ def _mt_contact(device, data, n_fingers, timestamp, frame):
     return 0
 
 
+def _is_mouse_mt_device(device):
+    """True if this multitouch device is a Magic Mouse.
+
+    The Magic Mouse shows up in MTDeviceCreateList like a trackpad; registering
+    it would hand the coast effect to a mouse (surface contact while mousing,
+    then a lift = a "flick"). Family IDs are private-API folklore (112 confirmed
+    for the Magic Mouse on this machine's macOS), so fail OPEN: if the family
+    can't be read, treat the device as a trackpad rather than silently disabling
+    coasting on some future trackpad.
+    """
+    try:
+        family = ctypes.c_int(-1)
+        if _mt.MTDeviceGetFamilyID(device, ctypes.byref(family)) == 0:
+            return family.value in MT_MOUSE_FAMILIES
+    except Exception:
+        pass
+    return False
+
+
 def _mt_open_devices():
     """Create, register, and start a FRESH set of MultitouchSupport devices.
 
@@ -298,6 +330,9 @@ def _mt_open_devices():
     after a long sleep the framework tears the old device objects down, and
     MTDeviceStart on a stale handle silently delivers no frames -- only devices
     from a newly created list come back to life. Used by both init and restart.
+
+    Magic Mice are skipped: only trackpads feed contact detection, which is what
+    keeps the coast effect trackpad-only.
     """
     devices = []
     device_list = _mt.MTDeviceCreateList()
@@ -307,6 +342,9 @@ def _mt_open_devices():
     for i in range(count):
         device = _cf.CFArrayGetValueAtIndex(device_list, i)
         if device:
+            if _is_mouse_mt_device(device):
+                _log("skipping Magic Mouse multitouch device")
+                continue
             _mt.MTRegisterContactFrameCallback(device, _mt_callback_ref)
             _mt.MTDeviceStart(device, 0)
             devices.append((_mt, device))
@@ -331,6 +369,8 @@ def _init_multitouch():
         _mt.MTRegisterContactFrameCallback.argtypes = [ctypes.c_void_p, _MTContactCallback]
         _mt.MTDeviceStart.argtypes = [ctypes.c_void_p, ctypes.c_int]
         _mt.MTDeviceStop.argtypes = [ctypes.c_void_p]
+        _mt.MTDeviceGetFamilyID.argtypes = [ctypes.c_void_p, ctypes.POINTER(ctypes.c_int)]
+        _mt.MTDeviceGetFamilyID.restype = ctypes.c_int
 
         _mt_callback_ref = _MTContactCallback(_mt_contact)
 
@@ -339,8 +379,9 @@ def _init_multitouch():
         _mt_last_frame = _now()
         return _mt_active
     except Exception as e:
-        print(f"MultitouchSupport unavailable ({e}); "
-              f"falling back to movement-based cancel only.")
+        print(f"MultitouchSupport unavailable ({e}); coasting disabled -- "
+              f"without contact detection a trackpad flick can't be told apart "
+              f"from ordinary mouse movement.")
         return False
 
 
@@ -351,7 +392,7 @@ def _restart_multitouch():
     nothing -- so we drop them and create a brand-new device list. Reviving this is
     what restores brake-on-touch: a finger placed down WITHOUT moving is seen only
     by MultitouchSupport, so while it's dead a coast won't stop on contact and
-    _should_launch is left on its movement-gap fallback."""
+    _should_launch refuses to start new coasts at all."""
     global _mt_devices, _mt_last_frame
     if not _mt_active:
         return
@@ -370,7 +411,10 @@ def _restart_multitouch():
 
 
 def _record_position(x, y, ts):
-    """Record a real cursor sample as (x, y, event_time_s, processing_time_s)."""
+    """Record a real cursor sample as (x, y, event_time, processing_time,
+    fingers_down). The contact tag is what attributes motion to a device class:
+    trackpad movement always happens under finger contact, mouse movement never
+    does, so only finger-down samples can launch a coast."""
     global _last_event_time, _last_wall_time, _ts_scale
     tp = _now()
     tw = time.time()
@@ -395,7 +439,7 @@ def _record_position(x, y, ts):
             # left over so this flick can't be averaged against stale samples.
             _last_positions.clear()
             _reset_stroke.clear()
-        _last_positions.append((x, y, te, tp))
+        _last_positions.append((x, y, te, tp, _fingers_down))
         if len(_last_positions) > HISTORY_LEN:
             _last_positions.pop(0)
         _last_event_time = tp
@@ -425,14 +469,19 @@ def _clear_history():
 def _recent_velocity():
     """Release velocity in px per FRAME_DT, weighted to the most recent motion.
 
-    Returns (vx, vy, age_s) where age_s is how long ago the newest sample was --
-    used to ignore a flick that the finger paused on before lifting.
+    Returns (vx, vy, age_s, touched): age_s is how long ago the newest sample
+    was -- used to ignore a flick that the finger paused on before lifting --
+    and touched says whether the window's motion happened under trackpad finger
+    contact. Mouse motion is all finger-up, so it reports touched=False. It's a
+    majority vote, not all-samples, because the tap thread races the multitouch
+    thread at the lift: the stroke's last event or two can land tagged
+    finger-up just after the contact frame flipped.
     """
     now = _now()
     with _lock:
         pts = list(_last_positions)
     if len(pts) < 2:
-        return 0.0, 0.0, float("inf")
+        return 0.0, 0.0, float("inf"), False
 
     te_new = pts[-1][2]
     tp_new = pts[-1][3]
@@ -442,15 +491,16 @@ def _recent_velocity():
     if len(window) < 2:
         window = pts[-2:]
 
-    x0, y0, te0, tp0 = window[0]
-    x1, y1, te1, tp1 = window[-1]
+    touched = sum(1 for p in window if p[4]) * 2 >= len(window)
+    x0, y0, te0, tp0, _ = window[0]
+    x1, y1, te1, tp1, _ = window[-1]
     # Time the flick by the events' own clock. Fall back to the larger of
     # event-dt and processing-dt so a burst of batched events (tiny processing-dt)
     # can never blow the velocity up; floor it to avoid divide-by-zero.
     dt = max(te1 - te0, tp1 - tp0, 1e-4)
     vx = (x1 - x0) / dt * FRAME_DT
     vy = (y1 - y0) / dt * FRAME_DT
-    return vx, vy, now - tp_new
+    return vx, vy, now - tp_new, touched
 
 
 def _post_move(x, y):
@@ -497,31 +547,28 @@ def _should_launch():
     if _coasting or not SETTINGS["enabled"]:
         return None
 
-    # Trust multitouch contact only while its frames are fresh. After sleep/wake it
-    # can go silent, freezing `_fingers_down` at False; if we kept trusting it we'd
-    # fire coasts *during* ordinary movement (the runaway sensitivity). When it's
-    # stale, fall back to inferring a lift from a pause in real movement instead.
+    # Coasting is trackpad-only, and fresh MultitouchSupport contact frames are
+    # the ONLY launch authority: they prove the motion came from fingers on a
+    # trackpad and that those fingers just lifted. When frames are stale --
+    # dead after sleep, or simply an untouched pad while a MOUSE moves the
+    # cursor -- a flick can't be told apart from ordinary mouse movement, so
+    # nothing launches. (There used to be a movement-gap fallback here for
+    # stale frames; a mouse sails straight through any such inference, so it's
+    # gone. The movement brake and the watchdog's MT recovery still run, and
+    # coasting resumes as soon as frames do.)
     mt_live = _mt_active and (_now() - _mt_last_frame) < MT_STALE_S
-    if mt_live:
-        # Authoritative contact info: never coast while a finger is on the pad.
-        if _fingers_down:
-            return None
-    else:
-        # No usable contact info: infer a lift from a pause in real movement events,
-        # so we never launch while the finger is still sweeping across the pad.
-        with _lock:
-            gap = _now() - _last_event_time
-            have = len(_last_positions) >= 2
-        if not have or gap < STOP_GAP_S:
-            return None
+    if not mt_live or _fingers_down:
+        return None
 
-    vx, vy, age = _recent_velocity()
+    vx, vy, age, touched = _recent_velocity()
+    if not touched:
+        return None  # motion happened with no trackpad contact -> it's a mouse
     if age > STALE_SAMPLE_S:
         return None  # finger paused before lifting -> no fling
     speed = (vx * vx + vy * vy) ** 0.5
     if speed < SETTINGS["min_launch_speed"] or speed > MAX_LAUNCH_SPEED:
         return None  # too slow to bother, or a glitch reading -> don't fling
-    _log(f"launch v=({vx:.0f},{vy:.0f}) speed={speed:.0f} mt_live={mt_live} fingers={_fingers_down}")
+    _log(f"launch v=({vx:.0f},{vy:.0f}) speed={speed:.0f}")
     return vx, vy
 
 
@@ -547,7 +594,7 @@ def _launcher():
             with _lock:
                 if len(_last_positions) < 2:
                     continue
-                x, y, _, _ = _last_positions[-1]
+                x, y = _last_positions[-1][:2]
 
             _clear_history()       # consume the flick so it can't relaunch later
             _coast_cancel.clear()
@@ -588,6 +635,7 @@ def _tap_watchdog():
     move events arriving but no contact frames) -- which otherwise persists until
     Coast is restarted. Launch gating already degrades safely when frames are
     stale; this just restores the instant brake-on-touch."""
+    global _mt_last_silent_rebuild
     while not _stop_requested:
         try:
             # Tick every TAP_HEALTH_S -- or instantly when _record_position detects a
@@ -601,13 +649,22 @@ def _tap_watchdog():
                 Quartz.CGEventTapEnable(_tap, True)
             if _mt_active:
                 now = _now()
-                # Dead-MT signature: real move events keep arriving (pad in use) but no
-                # contact frames -- brake-on-touch stays broken until we rebuild MT. Use
-                # a full health-check interval as the "recently used" window so activity
-                # that lands between ticks still triggers recovery.
-                if woke or (now - _mt_last_frame > 1.0 and now - _last_event_time < TAP_HEALTH_S):
+                # Dead-MT signature: real move events keep arriving but no contact
+                # frames -- brake-on-touch stays broken until we rebuild MT. Use a
+                # full health-check interval as the "recently used" window so activity
+                # that lands between ticks still triggers recovery. A MOUSE produces
+                # this exact signature all day long (moves arriving, untouched pad
+                # sending no frames), so silence alone only rebuilds when throttle-
+                # aged; wake-signal rebuilds stay immediate. A genuinely dead MT
+                # still recovers, at worst MT_SILENT_REBUILD_S later.
+                silent = (now - _mt_last_frame > 1.0
+                          and now - _last_event_time < TAP_HEALTH_S
+                          and now - _mt_last_silent_rebuild > MT_SILENT_REBUILD_S)
+                if woke or silent:
+                    if not woke:
+                        _mt_last_silent_rebuild = now
                     _log("wake signal -> rebuilding multitouch" if woke
-                         else "multitouch silent while pad in use -> rebuilding it")
+                         else "multitouch silent while pointer in use -> rebuilding it")
                     _restart_multitouch()
         except Exception as e:
             # The watchdog IS the recovery path; if it died, sleep/wake recovery
@@ -777,9 +834,10 @@ def _start_input_pipeline():
         CGEventSourceSetLocalEventsSuppressionInterval(_event_source, 0.0)
 
     if _init_multitouch():
-        print("Finger-contact detection active (instant brake on touch).")
+        print("Trackpad contact detection active (coast on flick, instant brake "
+              "on touch; mice are unaffected).")
     else:
-        print("Using movement-based cancel.")
+        print("No trackpad contact detection -> coasting disabled.")
 
     mask = CGEventMaskBit(kCGEventMouseMoved) | CGEventMaskBit(kCGEventLeftMouseDragged)
     _tap = CGEventTapCreate(
