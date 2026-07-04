@@ -32,6 +32,10 @@ again right away and it just works — no pause, no swallowed motion.
   average, so it feels like a real throw.
 - **Trackpads only** — coasting requires real finger contact, so mice are never affected.
   A Magic Mouse counts as a mouse, not a trackpad.
+- **Works through mouse capture** — when an app grabs the mouse and reads relative motion
+  (game streaming / remote desktop clients like Moonlight, games with mouse-look), Coast
+  detects the capture and delivers the glide as relative deltas, so the remote cursor
+  coasts too.
 - **Menu bar controls** — toggle on/off and tune the feel; settings persist to `~/.coast.json`.
 - **Survives sleep/wake** — re-arms its event tap automatically if macOS disables it, so it
   keeps working after your laptop wakes.

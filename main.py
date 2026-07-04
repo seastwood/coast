@@ -18,6 +18,15 @@ moving a regular mouse never coasts. The Magic Mouse -- itself a multitouch
 device -- is excluded from contact detection by its device family, so it
 behaves like any other mouse.
 
+The effect also carries through mouse CAPTURE (game streaming and remote
+desktop clients like Moonlight, and games with mouse-look). A capturing app
+decouples the cursor -- the on-screen position freezes -- and consumes only
+each event's relative delta fields. Coast recognizes that signature (deltas
+flowing while the position stays pinned), measures the flick from the deltas
+instead, and posts its coast moves with the delta fields populated, so the
+glide reaches the capturing app. Synthetic moves always carry deltas matching
+their motion, just like real hardware events.
+
 The coast moves the cursor by POSTING mouse-moved events from an event source
 whose local-events-suppression interval is zero. That is the crucial detail:
 CGWarpMouseCursorPosition suppresses real hardware input for ~250ms after every
@@ -64,6 +73,7 @@ from Quartz import (
     kCFRunLoopCommonModes,
     CGEventGetLocation,
     CGEventGetTimestamp,
+    CGEventSetTimestamp,
     CGEventCreateMouseEvent,
     CGEventPost,
     kCGHIDEventTap,
@@ -73,7 +83,11 @@ from Quartz import (
     CGEventSourceSetLocalEventsSuppressionInterval,
     CGEventSetIntegerValueField,
     CGEventGetIntegerValueField,
+    CGEventSetDoubleValueField,
+    CGEventGetDoubleValueField,
     kCGEventSourceUserData,
+    kCGMouseEventDeltaX,
+    kCGMouseEventDeltaY,
 )
 from Foundation import NSObject
 # noinspection PyUnresolvedReferences
@@ -100,6 +114,10 @@ IDLE_POLL_S = 0.25        # launcher wakeup cadence once the pad has gone idle
 PAD_ACTIVE_S = 0.5        # "pad in use" = a real move event within this window
 MIN_SPEED = 2.0           # px/frame below which the coast ends
 FRAME_DT = 1 / 120.0      # animation tick rate
+COARSE_WAIT_S = 0.002     # hand the last part of each frame wait to fine sleeps: a
+                          # condvar wait alone overshoots by 1-3ms under load, and in
+                          # captured mode tick-timing wobble IS remote cursor jitter
+FINE_SLEEP_S = 0.0005     # granularity of those end-of-frame sleeps
 TAP_HEALTH_S = 2.0        # how often to confirm the event tap is still enabled
 MAX_LAUNCH_SPEED = 700.0  # px/frame ceiling; faster than any human flick -> treat as a
                           # glitch (e.g. a timing hiccup) and don't fling the cursor
@@ -112,10 +130,13 @@ MT_SILENT_REBUILD_S = 30.0  # min gap between rebuilds triggered by frame silenc
                           # ordinary MOUSE movement mimics the dead-MT signature (moves
                           # arriving, untouched trackpad sending no frames), so silence
                           # rebuilds are throttled instead of firing every health tick
+CAPTURE_MIN_DELTA = 1.0   # px/frame: delta motion below this never reads as "captured"
+CAPTURE_POS_RATIO = 0.25  # captured = on-screen motion under this fraction of the delta
+                          # motion; normally the two agree, a pinned cursor reads ~0
 
 # ---- User-editable settings (live; changed from the menu bar) ----
 APP_NAME = "Coast"
-APP_VERSION = "1.3"   # shown in the menu header; build_dmg.sh stamps it into Info.plist
+APP_VERSION = "1.4"   # shown in the menu header; build_dmg.sh stamps it into Info.plist
 CONFIG_PATH = os.path.expanduser("~/.coast.json")
 # Older config filenames, read once if the current one is missing so settings
 # carry over after a rename.
@@ -143,8 +164,14 @@ ICON_POINT_SIZE = 16.0
 # event tap can tell them apart from real finger movement and ignore them.
 _SYNTHETIC_TAG = 0x7242B411
 
+# Unaccelerated ("raw") pointer-movement event fields. Some capture code reads
+# these instead of the classic accelerated deltas, so coast moves set both.
+# PyObjC exports the constants on recent macOS; fall back to the header values.
+_FIELD_UNACCEL_X = getattr(Quartz, "kCGEventUnacceleratedPointerMovementX", 170)
+_FIELD_UNACCEL_Y = getattr(Quartz, "kCGEventUnacceleratedPointerMovementY", 171)
+
 _lock = threading.Lock()
-_last_positions = []                 # list of (x, y, te, tp, fingers_down)
+_last_positions = []                 # list of (x, y, dx, dy, te, tp, fingers_down)
 _last_event_time = 0.0                # monotonic time of the last real event
 _last_wall_time = 0.0                 # wall-clock time of the last real event (sleep-aware)
 _coasting = False
@@ -410,11 +437,13 @@ def _restart_multitouch():
     _log(f"rebuilt multitouch -> {len(_mt_devices)} device(s)")
 
 
-def _record_position(x, y, ts):
-    """Record a real cursor sample as (x, y, event_time, processing_time,
-    fingers_down). The contact tag is what attributes motion to a device class:
-    trackpad movement always happens under finger contact, mouse movement never
-    does, so only finger-down samples can launch a coast."""
+def _record_position(x, y, dx, dy, ts):
+    """Record a real cursor sample as (x, y, dx, dy, event_time,
+    processing_time, fingers_down). The contact tag is what attributes motion
+    to a device class: trackpad movement always happens under finger contact,
+    mouse movement never does, so only finger-down samples can launch a coast.
+    dx/dy are the event's relative deltas -- the only motion that survives when
+    an app captures the mouse and the on-screen position freezes."""
     global _last_event_time, _last_wall_time, _ts_scale
     tp = _now()
     tw = time.time()
@@ -439,7 +468,7 @@ def _record_position(x, y, ts):
             # left over so this flick can't be averaged against stale samples.
             _last_positions.clear()
             _reset_stroke.clear()
-        _last_positions.append((x, y, te, tp, _fingers_down))
+        _last_positions.append((x, y, dx, dy, te, tp, _fingers_down))
         if len(_last_positions) > HISTORY_LEN:
             _last_positions.pop(0)
         _last_event_time = tp
@@ -469,80 +498,196 @@ def _clear_history():
 def _recent_velocity():
     """Release velocity in px per FRAME_DT, weighted to the most recent motion.
 
-    Returns (vx, vy, age_s, touched): age_s is how long ago the newest sample
-    was -- used to ignore a flick that the finger paused on before lifting --
-    and touched says whether the window's motion happened under trackpad finger
-    contact. Mouse motion is all finger-up, so it reports touched=False. It's a
-    majority vote, not all-samples, because the tap thread races the multitouch
-    thread at the lift: the stroke's last event or two can land tagged
-    finger-up just after the contact frame flipped.
+    Returns (vx, vy, age_s, touched, captured): age_s is how long ago the
+    newest sample was -- used to ignore a flick that the finger paused on
+    before lifting -- and touched says whether the window's motion happened
+    under trackpad finger contact. Mouse motion is all finger-up, so it reports
+    touched=False. It's a majority vote, not all-samples, because the tap
+    thread races the multitouch thread at the lift: the stroke's last event or
+    two can land tagged finger-up just after the contact frame flipped.
+
+    captured means an app has grabbed the mouse (Moonlight, games with
+    mouse-look): the on-screen position is pinned while the events' delta
+    fields keep reporting motion. Position-based velocity reads ~zero then, so
+    the deltas -- the very motion the capturing app consumes -- become the
+    velocity source, and the coast must be delivered as deltas too.
     """
     now = _now()
     with _lock:
         pts = list(_last_positions)
     if len(pts) < 2:
-        return 0.0, 0.0, float("inf"), False
+        return 0.0, 0.0, float("inf"), False, False
 
-    te_new = pts[-1][2]
-    tp_new = pts[-1][3]
+    te_new = pts[-1][4]
+    tp_new = pts[-1][5]
     # Anchor the window to the *newest* sample so the speed at release dominates,
     # rather than averaging in the slower start of the stroke.
-    window = [p for p in pts if p[2] >= te_new - VELOCITY_WINDOW_S]
+    window = [p for p in pts if p[4] >= te_new - VELOCITY_WINDOW_S]
     if len(window) < 2:
         window = pts[-2:]
 
-    touched = sum(1 for p in window if p[4]) * 2 >= len(window)
-    x0, y0, te0, tp0, _ = window[0]
-    x1, y1, te1, tp1, _ = window[-1]
+    touched = sum(1 for p in window if p[6]) * 2 >= len(window)
+    x0, y0 = window[0][:2]
+    x1, y1 = window[-1][:2]
+    te0, tp0 = window[0][4], window[0][5]
+    te1, tp1 = window[-1][4], window[-1][5]
     # Time the flick by the events' own clock. Fall back to the larger of
     # event-dt and processing-dt so a burst of batched events (tiny processing-dt)
     # can never blow the velocity up; floor it to avoid divide-by-zero.
     dt = max(te1 - te0, tp1 - tp0, 1e-4)
     vx = (x1 - x0) / dt * FRAME_DT
     vy = (y1 - y0) / dt * FRAME_DT
-    return vx, vy, now - tp_new, touched
+    # The same window's motion according to the delta fields. Skip the first
+    # sample: its delta describes motion that arrived BEFORE it, outside the
+    # window -- mirroring how the positions are differenced across the window.
+    dvx = sum(p[2] for p in window[1:]) / dt * FRAME_DT
+    dvy = sum(p[3] for p in window[1:]) / dt * FRAME_DT
+    pos_speed = (vx * vx + vy * vy) ** 0.5
+    delta_speed = (dvx * dvx + dvy * dvy) ** 0.5
+    # Normally the two agree (event deltas ARE the accelerated pointer motion),
+    # so a pinned position under real delta motion is the capture signature. A
+    # cursor shoved along a screen edge matches too -- harmless: that coast
+    # posts at the pinned spot and moves nothing on the desktop.
+    captured = (delta_speed > CAPTURE_MIN_DELTA
+                and pos_speed < CAPTURE_POS_RATIO * delta_speed)
+    if captured:
+        vx, vy = dvx, dvy
+    return vx, vy, now - tp_new, touched, captured
 
 
-def _post_move(x, y):
+def _event_timestamp():
+    """Current time in the unit real events use on this machine (_ts_scale
+    learned whether that's nanoseconds or mach ticks from the first real event).
+    Synthetic moves carry a live timestamp because hardware events do; a
+    consumer pacing or filtering motion by event time must never see our moves
+    frozen at t=0."""
+    ticks = _libc.mach_absolute_time()
+    if _ts_scale == 1e-9:
+        return int(ticks * MACH_TO_SEC * 1e9)   # ns since boot
+    return ticks
+
+
+def _post_move(x, y, dx=0, dy=0):
     """Move the cursor by posting a synthetic, tagged mouse-moved event.
 
     Unlike CGWarpMouseCursorPosition, a move posted from our zero-suppression
     source never blocks real hardware input, so a finger landing mid-coast takes
     over instantly. The tag lets _tap_callback ignore this as our own event.
+
+    dx/dy fill the event's relative-motion fields -- all that a mouse-capturing
+    app (Moonlight, games) reads; the desktop cursor follows only the absolute
+    position. Real hardware events carry both, so coast moves do too.
     """
     ev = CGEventCreateMouseEvent(_event_source, kCGEventMouseMoved, (x, y), kCGMouseButtonLeft)
     CGEventSetIntegerValueField(ev, kCGEventSourceUserData, _SYNTHETIC_TAG)
+    CGEventSetTimestamp(ev, _event_timestamp())
+    if dx or dy:
+        CGEventSetIntegerValueField(ev, kCGMouseEventDeltaX, dx)
+        CGEventSetIntegerValueField(ev, kCGMouseEventDeltaY, dy)
+        CGEventSetDoubleValueField(ev, _FIELD_UNACCEL_X, float(dx))
+        CGEventSetDoubleValueField(ev, _FIELD_UNACCEL_Y, float(dy))
     CGEventPost(kCGHIDEventTap, ev)
 
 
-def _coast(start_x, start_y, vx, vy):
+def _boost_coast_thread():
+    """Ask macOS for USER_INTERACTIVE QoS on the calling thread. Coast ticks
+    must land on time: in captured mode their timing IS the remote cursor's
+    smoothness, and at default QoS the scheduler wobbles them by milliseconds
+    whenever the system is busy (which a live stream guarantees)."""
+    try:
+        _libc.pthread_set_qos_class_self_np(0x21, 0)   # QOS_CLASS_USER_INTERACTIVE
+    except Exception:
+        pass
+
+
+def _sleep_until(deadline):
+    """Wait until `deadline` (monotonic seconds); True if the coast was
+    cancelled. Coarse-waits on the cancel event -- so a landing finger still
+    interrupts instantly -- then finishes the last COARSE_WAIT_S with sub-ms
+    sleeps, because a condvar wait alone overshoots its timeout by a few
+    milliseconds under load and that wobble shows up as remote-cursor jitter."""
+    while True:
+        remaining = deadline - _now()
+        if remaining <= 0:
+            return _coast_cancel.is_set()
+        if remaining > COARSE_WAIT_S:
+            if _coast_cancel.wait(remaining - COARSE_WAIT_S):
+                return True
+        else:
+            if _coast_cancel.is_set():
+                return True
+            time.sleep(min(remaining, FINE_SLEEP_S))
+
+
+def _coast(start_x, start_y, vx, vy, captured=False):
+    """Animate the glide; vx/vy are px per FRAME_DT.
+
+    Ticks are paced by absolute deadlines and each tick advances by the REAL
+    time elapsed since the previous one, not by one fixed frame. On the desktop
+    the difference is invisible -- positions are absolute, so a late event
+    still lands the cursor exactly where it belongs -- but a capturing app
+    (Moonlight) integrates our deltas at the instant each event arrives and
+    the stream encoder samples that cursor at a fixed rate: irregular ticks
+    put visibly unequal motion into successive video frames. Real trackpad
+    events are hardware-clocked metronomes; coast ticks have to be too.
+    """
     global _coasting
+    _boost_coast_thread()
     x, y = start_x, start_y
+    carry_x = carry_y = 0.0
+    frames = 1.0               # the first tick advances one ideal frame
+    last = _now()
+    deadline = last + FRAME_DT
+    ticks = [] if DEBUG else None
     try:
         while not (_stop_requested or _coast_cancel.is_set()):
             speed = (vx * vx + vy * vy) ** 0.5
             if speed < MIN_SPEED:
                 break
-            x += vx
-            y += vy
-            _post_move(x, y)
-            friction = SETTINGS["friction"]
-            vx *= friction
-            vy *= friction
-            # Sleep one frame, but wake the INSTANT a finger lands (cancel is set
-            # from the multitouch thread), so the brake feels immediate.
-            if _coast_cancel.wait(FRAME_DT):
+            # Deltas are integer event fields; carry the fraction frame-to-frame
+            # so a slow tail still trickles out instead of rounding to nothing.
+            fx = vx * frames + carry_x
+            fy = vy * frames + carry_y
+            dx, dy = round(fx), round(fy)
+            carry_x, carry_y = fx - dx, fy - dy
+            # While captured the cursor is pinned: post AT the pin (moving
+            # nothing on screen) and let the delta fields carry the motion. If
+            # the capture is released mid-coast, the first real cursor motion
+            # brakes the coast via the movement fallback, so the stale pin
+            # can't yank the freed cursor around.
+            if not captured:
+                x += vx * frames
+                y += vy * frames
+            _post_move(x, y, dx, dy)
+            decay = SETTINGS["friction"] ** frames
+            vx *= decay
+            vy *= decay
+            if _sleep_until(deadline):
                 break
+            now = _now()
+            # Cap catch-up so a stall (system hiccup, app nap) loses a little
+            # distance instead of turning into one violent jump-frame.
+            frames = min((now - last) / FRAME_DT, 4.0)
+            if ticks is not None:
+                ticks.append(now - last)
+            last = now
+            deadline += FRAME_DT
+            if deadline <= now:
+                deadline = now + FRAME_DT   # fell behind; restart the cadence
     except Exception as e:
         _log(f"coast error: {e!r}")   # end this coast; never kill future ones
     finally:
         _coasting = False
+        if ticks:
+            mean = sum(ticks) / len(ticks)
+            _log(f"coast ticks n={len(ticks)} mean={mean * 1e3:.2f}ms "
+                 f"max={max(ticks) * 1e3:.2f}ms captured={captured}")
 
 
 def _should_launch():
     """Decide whether a lift should start a coast, and with what velocity.
 
-    Returns (vx, vy) to launch, or None.
+    Returns (vx, vy, captured) to launch, or None.
     """
     if _coasting or not SETTINGS["enabled"]:
         return None
@@ -560,7 +705,7 @@ def _should_launch():
     if not mt_live or _fingers_down:
         return None
 
-    vx, vy, age, touched = _recent_velocity()
+    vx, vy, age, touched, captured = _recent_velocity()
     if not touched:
         return None  # motion happened with no trackpad contact -> it's a mouse
     if age > STALE_SAMPLE_S:
@@ -568,8 +713,9 @@ def _should_launch():
     speed = (vx * vx + vy * vy) ** 0.5
     if speed < SETTINGS["min_launch_speed"] or speed > MAX_LAUNCH_SPEED:
         return None  # too slow to bother, or a glitch reading -> don't fling
-    _log(f"launch v=({vx:.0f},{vy:.0f}) speed={speed:.0f}")
-    return vx, vy
+    _log(f"launch v=({vx:.0f},{vy:.0f}) speed={speed:.0f}"
+         f"{' captured' if captured else ''}")
+    return vx, vy, captured
 
 
 def _launcher():
@@ -589,7 +735,7 @@ def _launcher():
             launch = _should_launch()
             if launch is None:
                 continue
-            vx, vy = launch  # already bounded to MAX_LAUNCH_SPEED by _should_launch
+            vx, vy, captured = launch  # already bounded to MAX_LAUNCH_SPEED by _should_launch
 
             with _lock:
                 if len(_last_positions) < 2:
@@ -599,7 +745,7 @@ def _launcher():
             _clear_history()       # consume the flick so it can't relaunch later
             _coast_cancel.clear()
             _coasting = True
-            threading.Thread(target=_coast, args=(x, y, vx, vy), daemon=True).start()
+            threading.Thread(target=_coast, args=(x, y, vx, vy, captured), daemon=True).start()
         except Exception as e:
             # A surprise here would otherwise kill this thread -- and with it all
             # coasting -- until relaunch. Log and keep serving.
@@ -623,7 +769,9 @@ def _tap_callback(proxy, event_type, event, refcon):
                 if _coasting:
                     _coast_cancel.set()
                 loc = CGEventGetLocation(event)
-                _record_position(loc.x, loc.y, CGEventGetTimestamp(event))
+                dx = CGEventGetDoubleValueField(event, kCGMouseEventDeltaX)
+                dy = CGEventGetDoubleValueField(event, kCGMouseEventDeltaY)
+                _record_position(loc.x, loc.y, dx, dy, CGEventGetTimestamp(event))
     except Exception as e:
         _log(f"tap callback error: {e!r}")   # never let one bad event break the tap
     return event
