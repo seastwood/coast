@@ -26,7 +26,7 @@ final class Multitouch {
     private var start: Start?
     private var stop: Stop?
     private var familyID: FamilyID?
-    private var devices: [UnsafeMutableRawPointer] = []   // touched only by init and the watchdog thread
+    private var devices: [UnsafeMutableRawPointer] = []   // touched only on the main thread
     /// Contact detection came up at launch (at least one trackpad).
     private(set) var active = false
 

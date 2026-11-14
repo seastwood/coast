@@ -383,7 +383,9 @@ final class Engine {
             }
             if woke || silent {
                 log(woke ? "wake signal -> rebuilding multitouch" : "multitouch silent while pointer in use -> rebuilding it")
-                multitouch.restart()
+                // On the main thread, like the first start: the framework may deliver frames through
+                // the starting thread's run loop, and only the main thread's always runs.
+                DispatchQueue.main.sync { multitouch.restart() }
                 // Measure silence from this attempt, so the watchdog retries soon if frames still don't come.
                 locked { mtLastFrame = Clock.now() }
             }
