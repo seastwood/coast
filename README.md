@@ -46,7 +46,7 @@ again right away and it just works — no pause, no swallowed motion.
 ## Install
 
 1. Download **`Coast.dmg`** from the [Releases](https://github.com/seastwood/coast/releases)
-   page (Apple Silicon; for Intel, build from source below).
+   page (a universal app: Apple Silicon and Intel, macOS 12 or later).
 2. Open it and drag **Coast** onto **Applications**.
 3. First launch — Coast is self-signed (not notarized by Apple), so macOS blocks it once:
    - Double-click **Coast**. When macOS says it *"can't verify it's free of malware,"* click **Done**.
@@ -80,18 +80,18 @@ Your choices are saved to `~/.coast.json` and restored on launch.
 
 ## Build from source
 
-Requires macOS 11+ and Python 3.9+ (3.12 or newer recommended, e.g. Homebrew's `python3`: the packaged app bundles the venv's Python, and macOS's own 3.9 is past end of life).
+Coast is a native Swift app with no dependencies. Requires macOS 12+ and Xcode or the
+Command Line Tools (Swift 5.9+).
 
 ```bash
 git clone https://github.com/seastwood/coast.git
 cd coast
 
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-
-# Run directly during development:
-.venv/bin/python main.py
+# Run directly during development (debug logging to ~/.coast.log):
+COAST_DEBUG=1 swift run
 ```
+
+Running unbundled, macOS asks for the permissions for your terminal instead of Coast.
 
 ### Package a `.dmg`
 
@@ -120,11 +120,15 @@ python3 -m venv .venv
 
 | File | Purpose |
 | --- | --- |
-| `main.py` | The whole app — inertia engine plus the menu bar UI. |
-| `make_icon.py` | Generates `Coast.icns` from an SF Symbol. |
-| `set_icon.py` | Applies an icon to a file or mounted volume (used by the dmg build). |
+| `Sources/Coast/Engine.swift` | The inertia engine: flick measurement, launch rules, the real-time glide, sleep/wake recovery. |
+| `Sources/Coast/Multitouch.swift` | Finger-contact detection via the private MultitouchSupport framework. |
+| `Sources/Coast/MenuBar.swift` | The menu bar icon and menu. |
+| `Sources/Coast/Support.swift` | Tunables, settings, clocks, logging, single-instance lock. |
+| `Tools/make_icon.swift` | Generates `Coast.icns` from an SF Symbol. |
+| `Tools/set_icon.swift` | Applies an icon to a file or mounted volume (used by the dmg build). |
+| `VERSION` | The version shown in the menu and stamped into the app. |
 | `make_cert.sh` | Creates the stable self-signed signing identity. |
-| `build_dmg.sh` | Builds `Coast.app` and packages `Coast.dmg`. |
+| `build_dmg.sh` | Builds the universal `Coast.app` and packages `Coast.dmg`. |
 
 ## License
 
