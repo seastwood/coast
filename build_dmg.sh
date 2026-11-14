@@ -21,16 +21,23 @@ rm -rf dist dmg_staging "${APP}.dmg" "${APP}_rw.dmg"
 [ -d "$VOL" ] && hdiutil detach "$VOL" >/dev/null 2>&1 || true
 
 echo "==> Building ${APP} ${VERSION}"
-swift build -c release --triple arm64-apple-macosx12.0 --product "$APP"
-BINS=("$(swift build -c release --triple arm64-apple-macosx12.0 --show-bin-path)/$APP")
-if swift build -c release --triple x86_64-apple-macosx12.0 --product "$APP"; then
-  BINS+=("$(swift build -c release --triple x86_64-apple-macosx12.0 --show-bin-path)/$APP")
-else
-  echo "   WARNING: Intel build failed; packaging Apple Silicon only"
-fi
+# One build per architecture, each copied aside at once: newer SwiftPM build systems use the same
+# output folder for every triple, so the next build would overwrite it.
+mkdir -p "$TOOLS"
+BINS=()
+for ARCH in arm64 x86_64; do
+  TRIPLE="${ARCH}-apple-macosx12.0"
+  if swift build -c release --triple "$TRIPLE" --product "$APP"; then
+    cp "$(swift build -c release --triple "$TRIPLE" --show-bin-path)/$APP" "$TOOLS/$APP-$ARCH"
+    BINS+=("$TOOLS/$APP-$ARCH")
+  elif [ "$ARCH" = arm64 ]; then
+    echo "ERROR: Apple Silicon build failed"; exit 1
+  else
+    echo "   WARNING: Intel build failed; packaging Apple Silicon only"
+  fi
+done
 
 echo "==> Generating ${APP}.icns"
-mkdir -p "$TOOLS"
 xcrun swiftc -O Tools/make_icon.swift -o "$TOOLS/make_icon"
 xcrun swiftc -O Tools/set_icon.swift -o "$TOOLS/set_icon"
 "$TOOLS/make_icon" "$(pwd)"
