@@ -80,7 +80,7 @@ Your choices are saved to `~/.coast.json` and restored on launch.
 
 ## Build from source
 
-Requires macOS 11+ and Python 3.9+.
+Requires macOS 11+ and Python 3.9+ (3.12 or newer recommended, e.g. Homebrew's `python3`: the packaged app bundles the venv's Python, and macOS's own 3.9 is past end of life).
 
 ```bash
 git clone https://github.com/seastwood/coast.git

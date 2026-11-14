@@ -704,8 +704,26 @@ def _coast(start_x, start_y, vx, vy, captured=False):
     last = _now()
     deadline = last + FRAME_DT
     ticks = [] if DEBUG else None
+    seen = None                # where the cursor really was last tick
+    pinned_x = pinned_y = 0    # ticks an axis has been held by a screen edge
     try:
         while not (_stop_requested or _coast_cancel.is_set()):
+            if not captured:
+                # The window server keeps the cursor on a screen. An axis that
+                # stays put two ticks running while the glide is still ahead of
+                # it is pressed against an edge: drop that axis, so the glide
+                # slides along the edge or ends instead of pushing an unmoving
+                # cursor until friction stops it. Two ticks, so a move the
+                # window server hasn't applied yet isn't mistaken for an edge.
+                cur = CGEventGetLocation(Quartz.CGEventCreate(None))
+                if seen is not None:
+                    pinned_x = pinned_x + 1 if abs(cur.x - seen.x) < 0.5 and abs(x - cur.x) > 1.0 else 0
+                    pinned_y = pinned_y + 1 if abs(cur.y - seen.y) < 0.5 and abs(y - cur.y) > 1.0 else 0
+                    if pinned_x >= 2:
+                        vx, x, carry_x = 0.0, cur.x, 0.0
+                    if pinned_y >= 2:
+                        vy, y, carry_y = 0.0, cur.y, 0.0
+                seen = cur
             speed = (vx * vx + vy * vy) ** 0.5
             if speed < MIN_SPEED:
                 break
