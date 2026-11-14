@@ -42,6 +42,7 @@ final class Multitouch {
         familyID = dlsym(h, "MTDeviceGetFamilyID").map { unsafeBitCast($0, to: FamilyID.self) }
         devices = openDevices()
         active = !devices.isEmpty
+        log("multitouch: \(devices.count) trackpad(s)")
         return active
     }
 

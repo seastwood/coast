@@ -54,6 +54,8 @@ final class Engine {
         // what makes re-flicking instant (CGWarpMouseCursorPosition would block input for ~250 ms).
         source?.localEventsSuppressionInterval = 0
 
+        log("start \(appVersion): input monitoring \(CGPreflightListenEventAccess() ? "granted" : "missing"), "
+            + "accessibility \(CGPreflightPostEventAccess() ? "granted" : "missing")")
         if multitouch.open() {
             locked { mtLastFrame = Clock.now() }
             print("Trackpad contact detection active (coast on flick, instant brake on touch; mice are unaffected).")
@@ -65,6 +67,7 @@ final class Engine {
         guard let tap = CGEvent.tapCreate(tap: .cgSessionEventTap, place: .headInsertEventTap,
                                           options: .listenOnly,   // we never block real movement
                                           eventsOfInterest: mask, callback: tapCallback, userInfo: nil) else {
+            log("event tap could not be created")
             print("Failed to create event tap. Grant Accessibility / Input Monitoring to Coast in System Settings, then relaunch.")
             return false
         }
@@ -73,6 +76,7 @@ final class Engine {
         // Honor a persisted "off": the tap stays disabled until Coast is re-enabled from the menu.
         CGEvent.tapEnable(tap: tap, enable: settings.enabled)
 
+        log("event tap on (\(settings.enabled ? "enabled" : "Coast is off")), multitouch \(multitouch.active ? "active" : "unavailable")")
         background("launcher") { self.launcherLoop() }
         background("watchdog") { self.watchdogLoop() }
         return true
