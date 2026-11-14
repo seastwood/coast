@@ -48,6 +48,7 @@ Run directly in PyCharm. Quit from the menu bar, or Ctrl+C in the terminal.
 """
 
 import os
+import sys
 import json
 import time
 import ctypes
@@ -89,7 +90,7 @@ from Quartz import (
     kCGMouseEventDeltaX,
     kCGMouseEventDeltaY,
 )
-from Foundation import NSObject
+from Foundation import NSObject, NSProcessInfo
 # noinspection PyUnresolvedReferences
 from AppKit import (
     NSApplication,
@@ -123,6 +124,10 @@ MAX_LAUNCH_SPEED = 700.0  # px/frame ceiling; faster than any human flick -> tre
                           # glitch (e.g. a timing hiccup) and don't fling the cursor
 MT_STALE_S = 0.25         # no multitouch frame within this while the pad is in use ->
                           # contact detection has gone silent (typically after sleep)
+RT_COMPUTATION_S = 0.0015  # real-time coast thread: CPU it may use each frame ...
+RT_CONSTRAINT_S = 0.004   # ... and the window it must get that CPU within
+GIL_SWITCH_S = 0.001      # hand the GIL over within 1ms (Python's default is 5ms): a
+                          # coast tick waiting on it is a late tick
 MT_MOUSE_FAMILIES = {112, 113}  # MTDeviceGetFamilyID values for Magic Mice: multitouch
                           # devices too, but they're mice -- never give them the coast
                           # effect, so no contact callback is registered on them
@@ -600,6 +605,59 @@ def _boost_coast_thread():
         pass
 
 
+# NSProcessInfo activity options (NSProcessInfo.h). A menu-bar app with no visible
+# windows is a prime App Nap target: while a full-screen game or stream has the
+# screen, macOS coalesces its timers and lowers its priority, and coast ticks
+# land late and bunched -- a choppy glide exactly when something else is busy.
+_ACTIVITY_USER_INITIATED = 0x00EFFFFF   # ...AllowingIdleSystemSleep: no App Nap
+_ACTIVITY_LATENCY_CRITICAL = 0xFF00000000
+_app_activity = None                     # held for the process lifetime
+
+
+def _disable_app_nap():
+    global _app_activity
+    try:
+        _app_activity = NSProcessInfo.processInfo().beginActivityWithOptions_reason_(
+            _ACTIVITY_USER_INITIATED, "Coast animates the cursor after a flick")
+    except Exception as e:
+        _log(f"app nap opt-out failed: {e!r}")
+
+
+class _TimeConstraintPolicy(ctypes.Structure):
+    _fields_ = [("period", ctypes.c_uint32), ("computation", ctypes.c_uint32),
+                ("constraint", ctypes.c_uint32), ("preemptible", ctypes.c_int)]
+
+
+_THREAD_TIME_CONSTRAINT_POLICY = 2
+_libc.mach_thread_self.restype = ctypes.c_uint32
+_libc.thread_policy_set.argtypes = [ctypes.c_uint32, ctypes.c_uint32,
+                                    ctypes.c_void_p, ctypes.c_uint32]
+_libc.mach_port_deallocate.argtypes = [ctypes.c_uint32, ctypes.c_uint32]
+
+
+def _make_thread_realtime():
+    """Give the calling thread the time-constraint (real-time) policy audio and
+    display threads use: a 1/120s period with a little CPU guaranteed inside a
+    few ms. QoS alone is a hint the scheduler bends under load (a live stream, a
+    game); this is a deadline it keeps, so ticks stay metronomic while
+    something else is busy. The kernel demotes a thread that overruns its
+    computation, so a misbehaving coast can never hog a core."""
+    def ticks(seconds):
+        return int(seconds / MACH_TO_SEC)
+    try:
+        policy = _TimeConstraintPolicy(ticks(FRAME_DT), ticks(RT_COMPUTATION_S),
+                                       ticks(RT_CONSTRAINT_S), 1)
+        thread = _libc.mach_thread_self()
+        rc = _libc.thread_policy_set(thread, _THREAD_TIME_CONSTRAINT_POLICY,
+                                     ctypes.byref(policy), 4)
+        _libc.mach_port_deallocate(
+            ctypes.c_uint32.in_dll(_libc, "mach_task_self_").value, thread)
+        if rc != 0:
+            _log(f"real-time coast thread refused: {rc}")
+    except Exception as e:
+        _log(f"real-time coast thread failed: {e!r}")
+
+
 def _sleep_until(deadline):
     """Wait until `deadline` (monotonic seconds); True if the coast was
     cancelled. Coarse-waits on the cancel event -- so a landing finger still
@@ -633,6 +691,13 @@ def _coast(start_x, start_y, vx, vy, captured=False):
     """
     global _coasting
     _boost_coast_thread()
+    _make_thread_realtime()
+    activity = None
+    try:
+        activity = NSProcessInfo.processInfo().beginActivityWithOptions_reason_(
+            _ACTIVITY_USER_INITIATED | _ACTIVITY_LATENCY_CRITICAL, "Coasting the cursor")
+    except Exception:
+        pass
     x, y = start_x, start_y
     carry_x = carry_y = 0.0
     frames = 1.0               # the first tick advances one ideal frame
@@ -678,6 +743,8 @@ def _coast(start_x, start_y, vx, vy, captured=False):
         _log(f"coast error: {e!r}")   # end this coast; never kill future ones
     finally:
         _coasting = False
+        if activity is not None:
+            NSProcessInfo.processInfo().endActivity_(activity)
         if ticks:
             mean = sum(ticks) / len(ticks)
             _log(f"coast ticks n={len(ticks)} mean={mean * 1e3:.2f}ms "
@@ -1020,6 +1087,8 @@ def main():
         return
 
     load_settings()
+    sys.setswitchinterval(GIL_SWITCH_S)
+    _disable_app_nap()
 
     app = NSApplication.sharedApplication()
     app.setActivationPolicy_(NSApplicationActivationPolicyAccessory)  # menu bar only, no Dock icon
