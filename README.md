@@ -36,6 +36,8 @@ again right away and it just works — no pause, no swallowed motion.
   (game streaming / remote desktop clients like Moonlight, games with mouse-look), Coast
   detects the capture and delivers the glide as relative deltas, so the remote cursor
   coasts too.
+- **Smooth under load** — Coast opts out of App Nap and runs each glide on a real-time
+  thread, so the coast stays smooth while a game or stream keeps the Mac busy.
 - **Menu bar controls** — toggle on/off and tune the feel; settings persist to `~/.coast.json`.
 - **Survives sleep/wake** — re-arms its event tap automatically if macOS disables it, so it
   keeps working after your laptop wakes.
@@ -78,7 +80,7 @@ Your choices are saved to `~/.coast.json` and restored on launch.
 
 ## Build from source
 
-Requires macOS 11+ and Python 3.9+.
+Requires macOS 11+ and Python 3.9+ (3.12 or newer recommended, e.g. Homebrew's `python3`: the packaged app bundles the venv's Python, and macOS's own 3.9 is past end of life).
 
 ```bash
 git clone https://github.com/seastwood/coast.git

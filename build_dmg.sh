@@ -19,6 +19,20 @@ PYI=".venv/bin/pyinstaller"
 PLISTBUDDY="/usr/libexec/PlistBuddy"
 VOL="/Volumes/${APP}"
 
+# The app bundles the venv's Python, so build with a current one: macOS's own
+# /usr/bin/python3 is 3.9, past end of life. Creates .venv when missing, from
+# $PYTHON, else Homebrew's python3, else the first python3 on PATH.
+if [ ! -x "$PY" ]; then
+  BASE_PY="${PYTHON:-$(command -v /opt/homebrew/bin/python3 /usr/local/bin/python3 python3 | head -1)}"
+  echo "==> Creating .venv with $("$BASE_PY" --version)"
+  "$BASE_PY" -m venv .venv
+  .venv/bin/python -m pip install -q --upgrade pip
+  .venv/bin/pip install -q -r requirements.txt
+fi
+PY_VER="$("$PY" -c 'import sys; print("%d.%d" % sys.version_info[:2])')"
+echo "==> Bundling Python ${PY_VER}"
+case "$PY_VER" in 3.[0-9]) echo "   WARNING: Python ${PY_VER} is past end of life; delete .venv to rebuild it with a newer python3";; esac
+
 echo "==> Generating ${APP}.icns"
 "$PY" make_icon.py
 
