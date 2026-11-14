@@ -5,7 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "Coast",
-    platforms: [.macOS(.v11)],
+    platforms: [.macOS(.v12)],
     targets: [
         .executableTarget(name: "Coast", path: "Sources/Coast"),
     ]

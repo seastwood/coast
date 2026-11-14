@@ -21,10 +21,10 @@ rm -rf dist dmg_staging "${APP}.dmg" "${APP}_rw.dmg"
 [ -d "$VOL" ] && hdiutil detach "$VOL" >/dev/null 2>&1 || true
 
 echo "==> Building ${APP} ${VERSION}"
-swift build -c release --triple arm64-apple-macosx11.0 --product "$APP"
-BINS=("$(swift build -c release --triple arm64-apple-macosx11.0 --show-bin-path)/$APP")
-if swift build -c release --triple x86_64-apple-macosx11.0 --product "$APP"; then
-  BINS+=("$(swift build -c release --triple x86_64-apple-macosx11.0 --show-bin-path)/$APP")
+swift build -c release --triple arm64-apple-macosx12.0 --product "$APP"
+BINS=("$(swift build -c release --triple arm64-apple-macosx12.0 --show-bin-path)/$APP")
+if swift build -c release --triple x86_64-apple-macosx12.0 --product "$APP"; then
+  BINS+=("$(swift build -c release --triple x86_64-apple-macosx12.0 --show-bin-path)/$APP")
 else
   echo "   WARNING: Intel build failed; packaging Apple Silicon only"
 fi
@@ -52,7 +52,7 @@ cat > "$CONTENTS/Info.plist" <<PLIST
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
   <key>CFBundleVersion</key><string>${VERSION}</string>
-  <key>LSMinimumSystemVersion</key><string>11.0</string>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>LSUIElement</key><true/>
   <key>NSHighResolutionCapable</key><true/>
 </dict></plist>
