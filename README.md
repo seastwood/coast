@@ -41,12 +41,15 @@ again right away and it just works — no pause, no swallowed motion.
 - **Menu bar controls** — toggle on/off and tune the feel; settings persist to `~/.coast.json`.
 - **Survives sleep/wake** — re-arms its event tap automatically if macOS disables it, so it
   keeps working after your laptop wakes.
+- **Smooth during games and streams** — the glide runs in a small engine process that macOS Game
+  Mode doesn't throttle, so it stays smooth even with a full-screen game or stream in front.
+- **Update notice** — Coast checks GitHub for a new release about once a day and offers it in the menu.
 - **Native look** — a pure-white template icon in the menu bar, no Dock icon.
 
 ## Install
 
 1. Download **`Coast.dmg`** from the [Releases](https://github.com/seastwood/coast/releases)
-   page (Apple Silicon; for Intel, build from source below).
+   page (a universal app: Apple Silicon and Intel, macOS 12 or later).
 2. Open it and drag **Coast** onto **Applications**.
 3. First launch — Coast is self-signed (not notarized by Apple), so macOS blocks it once:
    - Double-click **Coast**. When macOS says it *"can't verify it's free of malware,"* click **Done**.
@@ -73,25 +76,25 @@ Click the menu bar icon:
 | Menu item | What it does |
 | --- | --- |
 | **Enabled** | Turn the effect on or off. |
-| **Glide** | How far the cursor coasts — friction: Short / Medium / Long. |
-| **Flick sensitivity** | How hard you must flick to start a coast: Low / Medium / High. |
+| **Glide** | Slider: how far the cursor coasts, from Short to Long (default 60%). |
+| **Flick sensitivity** | Slider: how gentle a flick still starts a coast, from Low to High (default 70%). |
 
 Your choices are saved to `~/.coast.json` and restored on launch.
 
 ## Build from source
 
-Requires macOS 11+ and Python 3.9+ (3.12 or newer recommended, e.g. Homebrew's `python3`: the packaged app bundles the venv's Python, and macOS's own 3.9 is past end of life).
+Coast is a native Swift app with no dependencies. Requires macOS 12+ and Xcode or the
+Command Line Tools (Swift 5.9+).
 
 ```bash
 git clone https://github.com/seastwood/coast.git
 cd coast
 
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-
-# Run directly during development:
-.venv/bin/python main.py
+# Run directly during development (debug logging to ~/.coast.log):
+COAST_DEBUG=1 swift run
 ```
+
+Running unbundled, macOS asks for the permissions for your terminal instead of Coast.
 
 ### Package a `.dmg`
 
@@ -120,11 +123,17 @@ python3 -m venv .venv
 
 | File | Purpose |
 | --- | --- |
-| `main.py` | The whole app — inertia engine plus the menu bar UI. |
-| `make_icon.py` | Generates `Coast.icns` from an SF Symbol. |
-| `set_icon.py` | Applies an icon to a file or mounted volume (used by the dmg build). |
+| `Sources/Coast/Engine.swift` | The inertia engine: flick measurement, launch rules, the real-time glide, sleep/wake recovery. |
+| `Sources/Coast/Multitouch.swift` | Finger-contact detection via the private MultitouchSupport framework. |
+| `Sources/Coast/MenuBar.swift` | The menu bar icon and menu. |
+| `Sources/Coast/EngineProcess.swift` | Runs the engine as its own process (out of Game Mode's reach) and talks to it. |
+| `Sources/Coast/UpdateChecker.swift` | The daily check for a new release. |
+| `Sources/Coast/Support.swift` | Tunables, settings, clocks, logging, single-instance lock. |
+| `Tools/make_icon.swift` | Generates `Coast.icns` from an SF Symbol. |
+| `Tools/set_icon.swift` | Applies an icon to a file or mounted volume (used by the dmg build). |
+| `VERSION` | The version shown in the menu and stamped into the app. |
 | `make_cert.sh` | Creates the stable self-signed signing identity. |
-| `build_dmg.sh` | Builds `Coast.app` and packages `Coast.dmg`. |
+| `build_dmg.sh` | Builds the universal `Coast.app` and packages `Coast.dmg`. |
 
 ## License
 
