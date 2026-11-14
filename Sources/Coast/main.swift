@@ -19,6 +19,8 @@
 // Settings persist to ~/.coast.json; COAST_DEBUG=1 logs to ~/.coast.log.
 import AppKit
 
+if CommandLine.arguments.contains("--engine") { runEngineProcess() }   // the engine process; never returns
+
 guard acquireSingleInstanceLock() else {
     print("\(appName) is already running; exiting this instance.")
     exit(0)
@@ -28,15 +30,18 @@ Settings.shared.load()
 
 // A menu bar app with no visible windows is a prime App Nap target: while a full-screen game or
 // stream has the screen, macOS coalesces its timers and lowers its priority, and coast ticks land
-// late and bunched. Held for the process lifetime.
+// late and bunched. Held for the process lifetime. (The glide itself runs in the engine process.)
 let appActivity = ProcessInfo.processInfo.beginActivity(
     options: .userInitiatedAllowingIdleSystemSleep, reason: "Coast animates the cursor after a flick")
 
 let app = NSApplication.shared
 app.setActivationPolicy(.accessory)   // menu bar only, no Dock icon
 
-let inputOK = Engine.shared.start()
-let menuBar = MenuBar(inputOK: inputOK)
+// The engine runs in its own process (see EngineProcess.swift): Game Mode throttles apps, not it.
+let engine = EngineHost()
+let menuBar = MenuBar(engine: engine)
+engine.onStatus = { menuBar.setInputOK($0) }
+engine.start()
 
 if let smoke = ProcessInfo.processInfo.environment["COAST_SMOKE_SECONDS"].flatMap(Double.init) {
     // Test hook: boot normally, then exit. Verifies a packaged build launches. No effect in normal use.

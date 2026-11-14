@@ -93,8 +93,18 @@ final class Signal {
 /// User-editable settings, changed from the menu bar and persisted to ~/.coast.json.
 final class Settings {
     static let shared = Settings()
-    static let glidePresets: [(String, Double)] = [("Short", 0.90), ("Medium", 0.93), ("Long", 0.965)]
-    static let sensitivityPresets: [(String, Double)] = [("Low", 14.0), ("Medium", 8.0), ("High", 4.0)]
+    /// False in the engine process: only the menu bar app writes the file.
+    var persist = true
+
+    // The menu's sliders run 0...1 on a log scale, so equal slider steps feel like equal changes.
+    // Glide: the coast's length scales with 1 / (1 - friction), from 5 (friction 0.80) to 50 (0.98).
+    // The old presets sit at about 30% (Short, 0.90), 46% (Medium, 0.93) and 76% (Long, 0.965).
+    static func friction(slider t: Double) -> Double { 1 - 1 / (5 * pow(10, t)) }
+    static func slider(friction f: Double) -> Double { min(max(log10(1 / (1 - min(f, 0.999)) / 5), 0), 1) }
+    // Flick sensitivity: the slowest flick that launches, from 20 px/frame (Low) to 2 (High).
+    // The old presets sit at about 15% (Low, 14), 40% (Medium, 8) and 70% (High, 4).
+    static func minLaunchSpeed(slider t: Double) -> Double { 20 * pow(0.1, t) }
+    static func slider(minLaunchSpeed s: Double) -> Double { min(max(log10(max(s, 0.01) / 20) / -1, 0), 1) }
 
     private let path = NSHomeDirectory() + "/.coast.json"
     // Older config filenames, read once if the current one is missing so settings carry over.
@@ -109,7 +119,7 @@ final class Settings {
     var minLaunchSpeed: Double { get { read { _minLaunchSpeed } } set { write { _minLaunchSpeed = newValue } } }
 
     private func read<T>(_ body: () -> T) -> T { lock.lock(); defer { lock.unlock() }; return body() }
-    private func write(_ body: () -> Void) { lock.lock(); body(); lock.unlock(); save() }
+    private func write(_ body: () -> Void) { lock.lock(); body(); lock.unlock(); if persist { save() } }
 
     func load() {
         for p in [path] + legacyPaths {
