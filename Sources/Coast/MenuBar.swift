@@ -5,6 +5,8 @@ final class MenuBar: NSObject {
     private let engine: EngineHost
     private let statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private let enabledItem = NSMenuItem(title: "Enabled", action: #selector(toggleEnabled), keyEquivalent: "")
+    private let updateItem = NSMenuItem(title: "", action: #selector(openUpdate), keyEquivalent: "")
+    private var updateURL: URL?
     private var glide: SliderRow!
     private var sensitivity: SliderRow!
 
@@ -24,6 +26,9 @@ final class MenuBar: NSObject {
         let header = NSMenuItem(title: "\(appName) \(appVersion)", action: nil, keyEquivalent: "")
         header.isEnabled = false
         menu.addItem(header)
+        updateItem.target = self
+        updateItem.isHidden = true   // shown only when a newer release exists
+        menu.addItem(updateItem)
         menu.addItem(.separator())
         enabledItem.target = self
         menu.addItem(enabledItem)
@@ -57,6 +62,17 @@ final class MenuBar: NSObject {
     /// The engine reports whether it could watch the trackpad.
     func setInputOK(_ ok: Bool) {
         statusItem.button?.toolTip = ok ? appName : "\(appName) (no input permission)"
+    }
+
+    /// A newer release exists: show "Update to Coast x…" under the header.
+    func showUpdate(version: String, url: URL) {
+        updateURL = url
+        updateItem.title = "Update to \(appName) \(version)…"
+        updateItem.isHidden = false
+    }
+
+    @objc private func openUpdate() {
+        if let updateURL { NSWorkspace.shared.open(updateURL) }
     }
 
     @objc private func toggleEnabled() {
@@ -125,12 +141,16 @@ private final class SliderRow: NSView {
         slider.target = self
         slider.action = #selector(changed)
 
-        // Menu items' text starts 14 pt in from the left edge on current macOS; match it.
-        titleLabel.frame = NSRect(x: 14, y: 36, width: 160, height: 17)
-        valueLabel.frame = NSRect(x: 176, y: 36, width: 60, height: 17)
-        slider.frame = NSRect(x: 14, y: 16, width: 222, height: 20)
-        lowLabel.frame = NSRect(x: 14, y: 2, width: 100, height: 14)
-        highLabel.frame = NSRect(x: 136, y: 2, width: 100, height: 14)
+        // Line up with the standard items: their titles start after the checkmark column (28 pt in on
+        // macOS 26 and later, 21 pt before), and their key equivalents end 6 pt from the right edge.
+        let left: CGFloat, right = frame.width - 6
+        if #available(macOS 26, *) { left = 28 } else { left = 21 }
+        let width = right - left
+        titleLabel.frame = NSRect(x: left, y: 36, width: width - 50, height: 17)
+        valueLabel.frame = NSRect(x: right - 50, y: 36, width: 50, height: 17)
+        slider.frame = NSRect(x: left, y: 16, width: width, height: 20)
+        lowLabel.frame = NSRect(x: left, y: 2, width: width / 2, height: 14)
+        highLabel.frame = NSRect(x: left + width / 2, y: 2, width: width / 2, height: 14)
         [titleLabel, valueLabel, slider, lowLabel, highLabel].forEach(addSubview)
         updateLabel()
     }

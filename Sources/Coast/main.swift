@@ -43,6 +43,9 @@ let menuBar = MenuBar(engine: engine)
 engine.onStatus = { menuBar.setInputOK($0) }
 engine.start()
 
+let updates = UpdateChecker { version, page in menuBar.showUpdate(version: version, url: page) }
+updates.start()
+
 if let smoke = ProcessInfo.processInfo.environment["COAST_SMOKE_SECONDS"].flatMap(Double.init) {
     // Test hook: boot normally, then exit. Verifies a packaged build launches. No effect in normal use.
     DispatchQueue.global().asyncAfter(deadline: .now() + smoke) { exit(0) }

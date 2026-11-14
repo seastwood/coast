@@ -111,8 +111,9 @@ final class Settings {
     private let legacyPaths = [NSHomeDirectory() + "/.trackball_inertia.json"]
     private let lock = NSLock()
     private var _enabled = true
-    private var _friction = 0.93          // velocity *= this every frame (higher = longer glide)
-    private var _minLaunchSpeed = 8.0     // don't coast for flicks slower than this px/frame
+    // Defaults: Glide 60% (friction ~0.950) and Flick sensitivity 70% (~4 px/frame), chosen in testing.
+    private var _friction = Settings.friction(slider: 0.60)          // velocity *= this every frame
+    private var _minLaunchSpeed = Settings.minLaunchSpeed(slider: 0.70)  // slower flicks don't coast (px/frame)
 
     var enabled: Bool { get { read { _enabled } } set { write { _enabled = newValue } } }
     var friction: Double { get { read { _friction } } set { write { _friction = newValue } } }

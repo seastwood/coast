@@ -41,6 +41,9 @@ again right away and it just works — no pause, no swallowed motion.
 - **Menu bar controls** — toggle on/off and tune the feel; settings persist to `~/.coast.json`.
 - **Survives sleep/wake** — re-arms its event tap automatically if macOS disables it, so it
   keeps working after your laptop wakes.
+- **Smooth during games and streams** — the glide runs in a small engine process that macOS Game
+  Mode doesn't throttle, so it stays smooth even with a full-screen game or stream in front.
+- **Update notice** — Coast checks GitHub for a new release about once a day and offers it in the menu.
 - **Native look** — a pure-white template icon in the menu bar, no Dock icon.
 
 ## Install
@@ -73,8 +76,8 @@ Click the menu bar icon:
 | Menu item | What it does |
 | --- | --- |
 | **Enabled** | Turn the effect on or off. |
-| **Glide** | How far the cursor coasts — friction: Short / Medium / Long. |
-| **Flick sensitivity** | How hard you must flick to start a coast: Low / Medium / High. |
+| **Glide** | Slider: how far the cursor coasts, from Short to Long (default 60%). |
+| **Flick sensitivity** | Slider: how gentle a flick still starts a coast, from Low to High (default 70%). |
 
 Your choices are saved to `~/.coast.json` and restored on launch.
 
@@ -123,6 +126,8 @@ Running unbundled, macOS asks for the permissions for your terminal instead of C
 | `Sources/Coast/Engine.swift` | The inertia engine: flick measurement, launch rules, the real-time glide, sleep/wake recovery. |
 | `Sources/Coast/Multitouch.swift` | Finger-contact detection via the private MultitouchSupport framework. |
 | `Sources/Coast/MenuBar.swift` | The menu bar icon and menu. |
+| `Sources/Coast/EngineProcess.swift` | Runs the engine as its own process (out of Game Mode's reach) and talks to it. |
+| `Sources/Coast/UpdateChecker.swift` | The daily check for a new release. |
 | `Sources/Coast/Support.swift` | Tunables, settings, clocks, logging, single-instance lock. |
 | `Tools/make_icon.swift` | Generates `Coast.icns` from an SF Symbol. |
 | `Tools/set_icon.swift` | Applies an icon to a file or mounted volume (used by the dmg build). |
