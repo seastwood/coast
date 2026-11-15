@@ -9,9 +9,7 @@
   Flick and lift — the pointer keeps gliding. Touch the trackpad — it stops dead.
 </p>
 
-<p align="center">
-  <a href="https://buymeacoffee.com/eastwoodsee"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="40" alt="Buy Me A Coffee"></a>
-</p>
+
 
 ---
 
@@ -118,6 +116,10 @@ Running unbundled, macOS asks for the permissions for your terminal instead of C
   if the finger doesn't move.
 - A small watchdog **re-enables the event tap** whenever macOS disables it (notably across
   sleep/wake).
+
+<p align="center">
+  <a href="https://buymeacoffee.com/eastwoodsee"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="40" alt="Buy Me A Coffee"></a>
+</p>
 
 ## Project layout
 
