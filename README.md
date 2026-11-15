@@ -117,9 +117,6 @@ Running unbundled, macOS asks for the permissions for your terminal instead of C
 - A small watchdog **re-enables the event tap** whenever macOS disables it (notably across
   sleep/wake).
 
-<p align="center">
-  <a href="https://buymeacoffee.com/eastwoodsee"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="40" alt="Buy Me A Coffee"></a>
-</p>
 
 ## Project layout
 
@@ -136,6 +133,10 @@ Running unbundled, macOS asks for the permissions for your terminal instead of C
 | `VERSION` | The version shown in the menu and stamped into the app. |
 | `make_cert.sh` | Creates the stable self-signed signing identity. |
 | `build_dmg.sh` | Builds the universal `Coast.app` and packages `Coast.dmg`. |
+
+<p align="center">
+  <a href="https://buymeacoffee.com/eastwoodsee"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" height="40" alt="Buy Me A Coffee"></a>
+</p>
 
 ## License
 
